@@ -1,0 +1,12 @@
+.vscode
+
+.DS_Store
+
+vendor/
+
+logs/
+
+config.yaml
+registration.yaml
+matrix-wechat.db
+
