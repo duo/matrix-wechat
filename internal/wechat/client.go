@@ -48,6 +48,24 @@ func (c *WechatClient) Disconnect() {
 	c.service.RemoveClient(c.mxid)
 }
 
+func (c *WechatClient) LoginWithQRCode() []byte {
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
+	var data []byte
+	err := c.service.RequestWebsocket(ctx, &WebsocketRequest{
+		MXID:    c.mxid,
+		Command: CommandLoginWithQRCode,
+	}, &data)
+
+	if err != nil {
+		c.log.Warnln("Failed to login with QR code:", err)
+		return nil
+	}
+
+	return data
+}
+
 func (c *WechatClient) IsLoggedIn() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()

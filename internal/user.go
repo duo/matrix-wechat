@@ -340,6 +340,10 @@ func (u *User) Login() error {
 	return err
 }
 
+func (u *User) LoginWtihQRCode() []byte {
+	return u.Client.LoginWithQRCode()
+}
+
 func (u *User) MarkLogin() {
 	info := u.Client.GetSelf()
 	if info != nil {

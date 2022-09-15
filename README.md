@@ -73,7 +73,7 @@ All setup and usage instructions can refer to [docs.mau.fi]. Some quick links:
     * [x] Avatar
   * [ ] Login types
 	* [ ] Password
-	* [ ] QR code
+	* [x] QR code
 
 * Misc
   * [ ] Automatic portal creation

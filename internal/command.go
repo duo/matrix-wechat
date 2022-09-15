@@ -15,6 +15,7 @@ import (
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/bridge/commands"
 	"maunium.net/go/mautrix/bridge/status"
+	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 )
 
@@ -80,7 +81,17 @@ func fnLogin(ce *WrappedCommandEvent) {
 		ce.Reply("Failed to log in: %v", err)
 		return
 	}
-	ce.Reply("Please confirm login on PC")
+
+	qrCode := ce.User.LoginWtihQRCode()
+	if len(qrCode) == 0 {
+		ce.Reply("Get QR code timed out. Please restart the login.")
+		return
+	}
+
+	qrEventID, err := ce.User.sendQR(ce, qrCode)
+	if err != nil {
+		return
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -88,6 +99,7 @@ func fnLogin(ce *WrappedCommandEvent) {
 	for {
 		if ce.User.IsLoggedIn() {
 			ce.User.MarkLogin()
+			_, _ = ce.Bot.RedactEvent(ce.RoomID, qrEventID)
 			ce.Reply("Login successful.")
 			break
 		}
@@ -99,6 +111,35 @@ func fnLogin(ce *WrappedCommandEvent) {
 			return
 		}
 	}
+}
+
+func (u *User) sendQR(ce *WrappedCommandEvent, qrCode []byte) (id.EventID, error) {
+	url, err := u.uploadQR(ce, qrCode)
+	if err != nil {
+		return "", err
+	}
+	content := event.MessageEventContent{
+		MsgType: event.MsgImage,
+		Body:    "",
+		URL:     url.CUString(),
+	}
+	resp, err := ce.Bot.SendMessageEvent(ce.RoomID, event.EventMessage, &content)
+	if err != nil {
+		u.log.Errorln("Failed to send edited QR code to user:", err)
+	}
+	return resp.EventID, nil
+}
+
+func (u *User) uploadQR(ce *WrappedCommandEvent, qrCode []byte) (id.ContentURI, error) {
+	bot := u.bridge.AS.BotClient()
+
+	resp, err := bot.UploadBytes(qrCode, "image/png")
+	if err != nil {
+		u.log.Errorln("Failed to upload QR code:", err)
+		ce.Reply("Failed to upload QR code: %v", err)
+		return id.ContentURI{}, err
+	}
+	return resp.ContentURI, nil
 }
 
 var cmdLogout = &commands.FullHandler{
