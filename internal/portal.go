@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -130,6 +131,13 @@ func (p *Portal) GetUsers() []*User {
 }
 
 func (p *Portal) handleWechatMessageLoopItem(msg PortalMessage) {
+	defer func() {
+		panicErr := recover()
+		if panicErr != nil {
+			p.log.Warnfln("Panic while process %+v: %v\n%s", msg, panicErr, debug.Stack())
+		}
+	}()
+
 	if len(p.MXID) == 0 {
 		p.log.Debugln("Creating Matrix room from incoming message")
 		err := p.CreateMatrixRoom(msg.source, nil, false)
@@ -152,6 +160,13 @@ func (p *Portal) handleWechatMessageLoopItem(msg PortalMessage) {
 }
 
 func (p *Portal) handleMatrixMessageLoopItem(msg PortalMatrixMessage) {
+	defer func() {
+		panicErr := recover()
+		if panicErr != nil {
+			p.log.Warnfln("Panic while process %+v: %v\n%s", msg, panicErr, debug.Stack())
+		}
+	}()
+
 	switch msg.evt.Type {
 	case event.EventMessage, event.EventSticker:
 		p.HandleMatrixMessage(msg.user, msg.evt)
@@ -278,22 +293,31 @@ func (p *Portal) convertWechatMentions(source *User, msg *wechat.WebsocketMessag
 	var mentions []string
 	json.Unmarshal(msg.Extra, &mentions)
 
-	var rawHead string
+	formattedBody := msg.Content
 	var formattedHead string
 
-	// TODO: a better mention replacement (name, and notify all)
+	// TODO: notify all?
 	for _, mention := range mentions {
 		mxid, name := p.bridge.Formatter.GetMatrixInfoByUID(p.MXID, types.NewUserUID(mention))
-		rawHead += fmt.Sprintf("@%s ", name)
-		formattedHead += fmt.Sprintf(`<a href="https://matrix.to/#/%s">%s</a> `, mxid, name)
+		groupNickname := source.Client.GetGroupMemberNickname(p.Key.UID.Uin, mention)
+		original := "@" + groupNickname
+		replacement := fmt.Sprintf(`<a href="https://matrix.to/#/%s">%s</a> `, mxid, name)
+
+		if len(groupNickname) > 0 && strings.Contains(msg.Content, original) {
+			formattedBody = strings.ReplaceAll(formattedBody, original, replacement)
+		} else {
+			formattedHead += replacement
+		}
 	}
-	formattedHead += "<br> "
+	if len(formattedHead) > 0 {
+		formattedHead += "<br> "
+	}
 
 	content := &event.MessageEventContent{
 		MsgType:       event.MsgText,
 		Format:        event.FormatHTML,
-		Body:          rawHead + msg.Content,
-		FormattedBody: formattedHead + msg.Content,
+		Body:          msg.Content,
+		FormattedBody: formattedHead + formattedBody,
 	}
 	converted := &ConvertedMessage{
 		Intent:  intent,
@@ -394,7 +418,12 @@ func (p *Portal) convertWechatApp(source *User, msg *wechat.WebsocketMessage, in
 		return p.makeMediaBridgeFailureMessage(msgID, errors.New("failed to decode wechat link"), converted)
 	}
 
-	body := fmt.Sprintf("[%s](%s)\n%s", data.Title, data.URL, data.Description)
+	var body string
+	if len(data.URL) > 0 {
+		body = fmt.Sprintf("[%s](%s)\n%s", data.Title, data.URL, data.Description)
+	} else {
+		body = fmt.Sprintf("**%s**\n%s", data.Title, data.Description)
+	}
 
 	content := &event.MessageEventContent{
 		MsgType:       event.MsgText,
@@ -1242,8 +1271,18 @@ func (p *Portal) HandleMatrixMessage(sender *User, evt *event.Event) {
 		text := content.Body
 
 		if content.Format == event.FormatHTML {
-			// TODO: a better mentions
 			formatted, mentionedUIDs := p.bridge.Formatter.ParseMatrix(content.FormattedBody)
+			for _, mention := range mentionedUIDs {
+				groupNickname := sender.Client.GetGroupMemberNickname(p.Key.UID.Uin, mention)
+				if len(groupNickname) > 0 {
+					formatted = strings.ReplaceAll(formatted, "@"+mention, "@"+groupNickname)
+				} else {
+					puppet := p.bridge.GetPuppetByUID(types.NewUserUID(mention))
+					if puppet != nil {
+						formatted = strings.ReplaceAll(formatted, "@"+mention, "@"+puppet.Displayname)
+					}
+				}
+			}
 			mentions = append(mentions, mentionedUIDs...)
 			text = formatted
 		}

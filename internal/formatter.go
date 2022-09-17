@@ -32,8 +32,7 @@ func NewFormatter(br *WechatBridge) *Formatter {
 						} else {
 							ctx[mentionedUIDsContextKey] = append(uids, puppet.UID.Uin)
 						}
-						//return "@" + puppet.UID.Uin
-						return "@" + puppet.Displayname
+						return "@" + puppet.UID.Uin
 					}
 				}
 				return mxid

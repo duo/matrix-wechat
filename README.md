@@ -3,12 +3,11 @@ A Matrix-Wechat puppeting bridge based on [mautrix-go](https://github.com/mautri
 
 ### Documentation
 
-All setup and usage instructions can refer to [docs.mau.fi]. Some quick links:
-
-[docs.mau.fi]: https://docs.mau.fi/bridges/go/whatsapp/index.html
+Some quick links:
 
 * [Bridge setup](https://docs.mau.fi/bridges/go/setup.html)
 * [Agent setup](https://github.com/duo/matrix-wechat-agent)
+* [Docker](https://hub.docker.com/r/lxduo/matrix-wechat)
 
 ### Features & roadmap
 
@@ -42,13 +41,13 @@ All setup and usage instructions can refer to [docs.mau.fi]. Some quick links:
     * [ ] Name
     * [ ] Avatar
 
-* QQ → Matrix
+* Wechat → Matrix
   * [ ] Message types
     * [x] Text
-	* [x] Image
-	* [ ] Sticker
-	* [x] Video
-	* [x] Audio
+    * [x] Image
+    * [ ] Sticker
+    * [x] Video
+    * [x] Audio
     * [x] File
     * [x] Mention
     * [x] Reply

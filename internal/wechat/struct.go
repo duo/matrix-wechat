@@ -6,17 +6,18 @@ import (
 )
 
 const (
-	CommandConnect         = "connect"
-	CommandDisconnect      = "disconnect"
-	CommandLoginWithQRCode = "log_qr"
-	CommandIsLogin         = "is_login"
-	CommandGetSelf         = "get_self"
-	CommandGetUserInfo     = "get_user_info"
-	CommandGetGroupInfo    = "get_group_info"
-	CommandGetGroupMembers = "get_group_members"
-	CommandGetFriendList   = "get_friend_list"
-	CommandGetGroupList    = "get_group_list"
-	CommandSendMessage     = "send_message"
+	CommandConnect                = "connect"
+	CommandDisconnect             = "disconnect"
+	CommandLoginWithQRCode        = "log_qr"
+	CommandIsLogin                = "is_login"
+	CommandGetSelf                = "get_self"
+	CommandGetUserInfo            = "get_user_info"
+	CommandGetGroupInfo           = "get_group_info"
+	CommandGetGroupMembers        = "get_group_members"
+	CommandGetGroupMemberNickname = "get_group_member_nickname"
+	CommandGetFriendList          = "get_friend_list"
+	CommandGetGroupList           = "get_group_list"
+	CommandSendMessage            = "send_message"
 
 	CommandResponse = "response"
 	CommandError    = "error"
@@ -51,7 +52,8 @@ type IsLoginData struct {
 }
 
 type QueryData struct {
-	ID string `json:"wxId"`
+	ID    string `json:"wxId"`
+	Group string `json:"groupId"`
 }
 
 type MatrixMessage struct {

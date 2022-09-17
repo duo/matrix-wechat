@@ -159,6 +159,25 @@ func (c *WechatClient) GetGroupMembers(wxid string) []string {
 	return data
 }
 
+func (c *WechatClient) GetGroupMemberNickname(group, wxid string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
+	var data string
+	err := c.service.RequestWebsocket(ctx, &WebsocketRequest{
+		MXID:    c.mxid,
+		Command: CommandGetGroupMemberNickname,
+		Data:    &QueryData{ID: wxid, Group: group},
+	}, &data)
+
+	if err != nil {
+		c.log.Warnln("Failed to get group member nickname:", err)
+		return ""
+	}
+
+	return data
+}
+
 func (c *WechatClient) GetFriendList() []*UserInfo {
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
