@@ -8,7 +8,7 @@ import (
 const (
 	CommandConnect                = "connect"
 	CommandDisconnect             = "disconnect"
-	CommandLoginWithQRCode        = "log_qr"
+	CommandLoginWithQRCode        = "login_qr"
 	CommandIsLogin                = "is_login"
 	CommandGetSelf                = "get_self"
 	CommandGetUserInfo            = "get_user_info"
