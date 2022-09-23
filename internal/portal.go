@@ -1261,6 +1261,10 @@ func (p *Portal) HandleMatrixMessage(sender *User, evt *event.Event) {
 		}
 	}
 
+	if evt.Type == event.EventSticker {
+		content.MsgType = event.MsgImage
+	}
+
 	msg := &wechat.MatrixMessage{
 		Target: target,
 	}
@@ -1314,7 +1318,7 @@ func (p *Portal) HandleMatrixMessage(sender *User, evt *event.Event) {
 			Binary: data,
 		}
 	default:
-		p.log.Warnfln("%q not support", content.MsgType)
+		p.log.Warnfln("%s not support", content.MsgType)
 		return
 	}
 
