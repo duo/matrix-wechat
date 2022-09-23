@@ -45,7 +45,7 @@ Some quick links:
   * [ ] Message types
     * [x] Text
     * [x] Image
-    * [ ] Sticker
+    * [x] Sticker
     * [x] Video
     * [x] Audio
     * [x] File
@@ -66,7 +66,7 @@ Some quick links:
   * [ ] Group metadata
     * [x] Name
     * [x] Avatar
-	* [ ] Topic
+	* [x] Topic
   * [x] User metadata
     * [x] Name
     * [x] Avatar

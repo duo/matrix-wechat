@@ -265,6 +265,8 @@ func (p *Portal) handleWechatMessage(source *User, msg *wechat.WebsocketMessage)
 		converted = p.convertWechatMedia(source, msg, intent)
 	case wechat.EventLocation:
 		converted = p.convertWechatLocation(source, msg, intent)
+	case wechat.EventNotice:
+		p.UpdateTopic(msg.Content, types.EmptyUID, false)
 	case wechat.EventApp:
 		converted = p.convertWechatApp(source, msg, intent)
 	}
@@ -693,7 +695,10 @@ func (p *Portal) UpdateMetadata(user *User, groupInfo *wechat.GroupInfo, forceAv
 	p.SyncParticipants(user, groupInfo, forceAvatarSync)
 	update := false
 	update = p.UpdateName(groupInfo.Name, types.EmptyUID, false) || update
-	//update = p.UpdateTopic(groupInfo.Topic, types.EmptyUID, false) || update
+
+	if info := user.Client.GetGroupInfo(groupInfo.ID); info != nil {
+		update = p.UpdateTopic(info.Notice, types.EmptyUID, false) || update
+	}
 
 	// TODO: restrict message sending and changes
 

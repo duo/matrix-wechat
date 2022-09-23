@@ -31,6 +31,7 @@ const (
 	EventVideo    = "m.video"
 	EventFile     = "m.file"
 	EventLocation = "m.location"
+	EventNotice   = "m.notice"
 	EventApp      = "m.app"
 )
 
@@ -44,6 +45,7 @@ type GroupInfo struct {
 	ID        string   `json:"wxId"`
 	Name      string   `json:"wxNickName"`
 	BigAvatar string   `json:"wxBigAvatar"`
+	Notice    string   `json:"notice"`
 	Members   []string `json:"members"`
 }
 

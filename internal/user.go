@@ -525,8 +525,6 @@ func (u *User) updateAvatar(uid types.UID, avatarID *string, avatarURL *id.Conte
 		}
 	}
 
-	u.log.Infoln("get user info", uid.IsUser(), uid.Uin, url)
-
 	if len(url) == 0 {
 		return false
 	}
