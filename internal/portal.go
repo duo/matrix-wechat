@@ -552,6 +552,7 @@ func (p *Portal) SyncParticipants(source *User, metadata *wechat.GroupInfo, forc
 		participantMap[uid] = true
 		puppet := p.bridge.GetPuppetByUID(uid)
 		puppet.SyncContact(source, forceAvatarSync, "group participant")
+		p.UpdateRoomNickname(source, wxid)
 		user := p.bridge.GetUserByUID(uid)
 		if user != nil && user != source {
 			p.ensureUserInvited(user)
@@ -579,6 +580,27 @@ func (p *Portal) SyncParticipants(source *User, metadata *wechat.GroupInfo, forc
 	}
 
 	p.kickExtraUsers(participantMap)
+}
+
+func (p *Portal) UpdateRoomNickname(source *User, wxid string) {
+	groupNickname := source.Client.GetGroupMemberNickname(p.Key.UID.Uin, wxid)
+	if len(groupNickname) <= 0 {
+		return
+	}
+
+	puppet := p.bridge.GetPuppetByUID(types.NewUserUID(wxid))
+
+	roomNickname, _ := p.bridge.Config.Bridge.FormatDisplayname(
+		*types.NewContact(wxid, groupNickname),
+	)
+	memberContent := puppet.IntentFor(p).Member(p.MXID, puppet.MXID)
+	if memberContent.Displayname != roomNickname {
+		memberContent.Displayname = roomNickname
+		if _, err := puppet.DefaultIntent().SendStateEvent(
+			p.MXID, event.StateMember, puppet.MXID.String(), memberContent); err == nil {
+			p.bridge.AS.StateStore.SetMember(p.MXID, puppet.MXID, memberContent)
+		}
+	}
 }
 
 func (p *Portal) UpdateAvatar(user *User, setBy types.UID, updateInfo bool) bool {

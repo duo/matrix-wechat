@@ -525,7 +525,7 @@ func (u *User) updateAvatar(uid types.UID, avatarID *string, avatarURL *id.Conte
 		}
 	}
 
-	if len(url) == 0 {
+	if len(url) == 0 || url == *avatarID {
 		return false
 	}
 
@@ -536,7 +536,7 @@ func (u *User) updateAvatar(uid types.UID, avatarID *string, avatarURL *id.Conte
 	}
 
 	*avatarURL = resp
-	*avatarID = "Portrait"
+	*avatarID = url
 	*avatarSet = false
 
 	return true

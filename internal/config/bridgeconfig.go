@@ -148,7 +148,7 @@ func (bc *BridgeConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-func (bc BridgeConfig) FormatDisplayname(uid types.UID, contact types.ContactInfo) (string, int8) {
+func (bc BridgeConfig) FormatDisplayname(contact types.ContactInfo) (string, int8) {
 	var buf strings.Builder
 	_ = bc.displaynameTemplate.Execute(&buf, contact)
 
