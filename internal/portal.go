@@ -735,7 +735,7 @@ func (p *Portal) UpdateMatrixRoom(user *User, groupInfo *wechat.GroupInfo, force
 	if len(p.MXID) == 0 {
 		return false
 	}
-	p.log.Infoln("Syncing portal for", user.MXID)
+	p.log.Infofln("Syncing portal %s for %s", p.Key, user.MXID)
 
 	p.ensureUserInvited(user)
 	go p.addToSpace(user)

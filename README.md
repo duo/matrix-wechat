@@ -8,6 +8,7 @@ Some quick links:
 * [Bridge setup](https://docs.mau.fi/bridges/go/setup.html)
 * [Agent setup](https://github.com/duo/matrix-wechat-agent)
 * [Docker](https://hub.docker.com/r/lxduo/matrix-wechat)
+* [Step by Step (Chinese)](https://duo.github.io/posts/matrix-qq-wechat/)
 
 ### Features & roadmap
 
