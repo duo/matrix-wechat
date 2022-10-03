@@ -75,6 +75,15 @@ func fnLogin(ce *WrappedCommandEvent) {
 		return
 	}
 
+	ce.Bridge.checkersLock.Lock()
+	if checker, ok := ce.Bridge.checkers[ce.User.MXID]; ok {
+		select {
+		case checker <- struct{}{}:
+		default:
+		}
+	}
+	ce.Bridge.checkersLock.Unlock()
+
 	err := ce.User.Login()
 	if err != nil {
 		ce.User.log.Errorf("Failed to log in:", err)
@@ -99,6 +108,32 @@ func fnLogin(ce *WrappedCommandEvent) {
 	for {
 		if ce.User.IsLoggedIn() {
 			ce.User.MarkLogin()
+
+			ce.Bridge.checkersLock.Lock()
+			stopChecker := make(chan struct{})
+			ce.Bridge.checkers[ce.User.MXID] = stopChecker
+			go func() {
+				clock := time.NewTicker(time.Minute)
+				defer func() {
+					ce.User.log.Infoln("Checker stopped.")
+					clock.Stop()
+				}()
+				ce.User.log.Infoln("Check WeChat login status every minute.")
+				for {
+					select {
+					case <-clock.C:
+						if !ce.User.IsLoggedIn() {
+							ce.User.DeleteConnection()
+							ce.Reply("You're not logged into Wechat.")
+							return
+						}
+					case <-stopChecker:
+						return
+					}
+				}
+			}()
+			ce.Bridge.checkersLock.Unlock()
+
 			_, _ = ce.Bot.RedactEvent(ce.RoomID, qrEventID)
 			ce.Reply("Login successful.")
 			break

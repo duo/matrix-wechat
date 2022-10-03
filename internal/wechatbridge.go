@@ -35,6 +35,8 @@ type WechatBridge struct {
 	puppets             map[types.UID]*Puppet
 	puppetsByCustomMXID map[id.UserID]*Puppet
 	puppetsLock         sync.Mutex
+	checkers            map[id.UserID]chan struct{}
+	checkersLock        sync.Mutex
 }
 
 func NewWechatBridge(exampleConfig string) *WechatBridge {
@@ -47,6 +49,7 @@ func NewWechatBridge(exampleConfig string) *WechatBridge {
 		portalsByUID:        make(map[database.PortalKey]*Portal),
 		puppets:             make(map[types.UID]*Puppet),
 		puppetsByCustomMXID: make(map[id.UserID]*Puppet),
+		checkers:            make(map[id.UserID]chan struct{}),
 	}
 }
 
@@ -85,6 +88,13 @@ func (br *WechatBridge) Start() {
 }
 
 func (br *WechatBridge) Stop() {
+	for _, checker := range br.checkers {
+		select {
+		case checker <- struct{}{}:
+		default:
+		}
+	}
+
 	for _, user := range br.usersByUsername {
 		if user.Client == nil {
 			continue
