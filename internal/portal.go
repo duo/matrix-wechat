@@ -528,6 +528,27 @@ func (p *Portal) kickExtraUsers(participantMap map[types.UID]bool) {
 	}
 }
 
+func (p *Portal) syncParticipant(source *User, participant string, puppet *Puppet, user *User, forceAvatarSync bool, wg *sync.WaitGroup) {
+	defer func() {
+		wg.Done()
+		if err := recover(); err != nil {
+			p.log.Errorfln("Syncing participant %s panicked: %v\n%s", participant, err, debug.Stack())
+		}
+	}()
+
+	puppet.SyncContact(source, forceAvatarSync, "group participant")
+	p.UpdateRoomNickname(source, participant)
+	if user != nil && user != source {
+		p.ensureUserInvited(user)
+	}
+	if user == nil || !puppet.IntentFor(p).IsCustomPuppet {
+		err := puppet.IntentFor(p).EnsureJoined(p.MXID)
+		if err != nil {
+			p.log.Warnfln("Failed to make puppet of %s join %s: %v", participant, p.MXID, err)
+		}
+	}
+}
+
 func (p *Portal) SyncParticipants(source *User, metadata *wechat.GroupInfo, forceAvatarSync bool) {
 	changed := false
 	levels, err := p.MainIntent().PowerLevels(p.MXID)
@@ -546,22 +567,19 @@ func (p *Portal) SyncParticipants(source *User, metadata *wechat.GroupInfo, forc
 	}
 
 	changed = p.applyPowerLevelFixes(levels) || changed
+	var wg sync.WaitGroup
+	wg.Add(len(metadata.Members))
 	participantMap := make(map[types.UID]bool)
-	for _, wxid := range metadata.Members {
-		uid := types.NewUserUID(wxid)
+	for _, participant := range metadata.Members {
+		uid := types.NewUserUID(participant)
 		participantMap[uid] = true
 		puppet := p.bridge.GetPuppetByUID(uid)
-		puppet.SyncContact(source, forceAvatarSync, "group participant")
-		p.UpdateRoomNickname(source, wxid)
 		user := p.bridge.GetUserByUID(uid)
-		if user != nil && user != source {
-			p.ensureUserInvited(user)
-		}
-		if user == nil || !puppet.IntentFor(p).IsCustomPuppet {
-			err = puppet.IntentFor(p).EnsureJoined(p.MXID)
-			if err != nil {
-				p.log.Warnfln("Failed to make puppet of %s join %s: %v", uid, p.MXID, err)
-			}
+
+		if p.bridge.Config.Bridge.ParallelMemberSync {
+			go p.syncParticipant(source, participant, puppet, user, forceAvatarSync, &wg)
+		} else {
+			p.syncParticipant(source, participant, puppet, user, forceAvatarSync, &wg)
 		}
 
 		expectedLevel := 0
@@ -580,6 +598,8 @@ func (p *Portal) SyncParticipants(source *User, metadata *wechat.GroupInfo, forc
 	}
 
 	p.kickExtraUsers(participantMap)
+	wg.Wait()
+	p.log.Debugln("Participant sync completed")
 }
 
 func (p *Portal) UpdateRoomNickname(source *User, wxid string) {

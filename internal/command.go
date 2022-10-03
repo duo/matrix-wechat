@@ -477,24 +477,23 @@ var cmdSync = &commands.FullHandler{
 	Help: commands.HelpMeta{
 		Section:     HelpSectionMiscellaneous,
 		Description: "Synchronize data from Wechat.",
-		Args:        "<contacts/groups/space> [--create-portals]",
+		Args:        "<contacts/groups/space> [--contact-avatars] [--create-portals]",
 	},
 	RequiresLogin: true,
 }
 
 func fnSync(ce *WrappedCommandEvent) {
-	if len(ce.Args) == 0 {
+	args := strings.ToLower(strings.Join(ce.Args, " "))
+	contacts := strings.Contains(args, "contacts")
+	space := strings.Contains(args, "space")
+	groups := strings.Contains(args, "groups") || space
+	if !contacts && !space && !groups {
 		ce.Reply("**Usage:** `sync <contacts/groups/space> [--contact-avatars] [--create-portals]`")
 		return
 	}
-	args := strings.ToLower(strings.Join(ce.Args, " "))
-	contacts := strings.Contains(args, "contacts")
-	appState := strings.Contains(args, "appstate")
-	space := strings.Contains(args, "space")
-	groups := strings.Contains(args, "groups") || space
 	createPortals := strings.Contains(args, "--create-portals")
 	contactAvatars := strings.Contains(args, "--contact-avatars")
-	if contactAvatars && (!contacts || appState) {
+	if contactAvatars && !contacts {
 		ce.Reply("`--contact-avatars` can only be used with `sync contacts`")
 		return
 	}
