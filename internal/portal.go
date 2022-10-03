@@ -221,6 +221,26 @@ func (p *Portal) handleFakeMessage(msg fakeMessage) {
 	}
 }
 
+func (p *Portal) handleWechatRevoke(source *User, msgID uint64, operator string) {
+	msg := p.bridge.DB.Message.GetByMsgID(p.Key, strconv.FormatUint(msgID, 10))
+	if msg == nil || msg.IsFakeMXID() {
+		return
+	}
+
+	intent := p.bridge.GetPuppetByUID(types.NewUserUID(operator)).IntentFor(p)
+	_, err := intent.RedactEvent(p.MXID, msg.MXID)
+	if err != nil {
+		if errors.Is(err, mautrix.MForbidden) {
+			_, err = p.MainIntent().RedactEvent(p.MXID, msg.MXID)
+			if err != nil {
+				p.log.Errorln("Failed to redact %s: %v", msg.MsgID, err)
+			}
+		}
+		//} else {
+		//msg.Delete()
+	}
+}
+
 func (p *Portal) handleWechatMessage(source *User, msg *wechat.WebsocketMessage) {
 	if len(p.MXID) == 0 {
 		p.log.Warnln("handleWechatMessage called even though portal.MXID is empty")
@@ -233,7 +253,11 @@ func (p *Portal) handleWechatMessage(source *User, msg *wechat.WebsocketMessage)
 
 	existingMsg := p.bridge.DB.Message.GetByMsgID(p.Key, msgID)
 	if existingMsg != nil {
-		p.log.Debugfln("Not handling %s: message is duplicate", msgID)
+		if msg.EventType == wechat.EventRevoke {
+			p.handleWechatRevoke(source, msg.ID, msg.Sender)
+		} else {
+			p.log.Debugfln("Not handling %s: message is duplicate", msgID)
+		}
 		return
 	}
 

@@ -29,6 +29,8 @@ type BridgeConfig struct {
 	MessageErrorNotices bool `yaml:"message_error_notices"`
 	PortalMessageBuffer int  `yaml:"portal_message_buffer"`
 
+	AllowRedaction bool `yaml:"allow_redaction"`
+
 	UserAvatarSync bool `yaml:"user_avatar_sync"`
 
 	SyncWithCustomPuppets bool `yaml:"sync_with_custom_puppets"`

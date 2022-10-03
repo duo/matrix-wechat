@@ -50,7 +50,7 @@ appservice:
         # Display name and avatar for bot. Set to "remove" to remove display name/avatar, leave empty
         # to leave display name/avatar as-is.
         displayname: Wechat bridge bot
-        avatar: mxc://matrix.org/eRgNtxpDquFbWmtYvbtxafzR
+        avatar: mxc://matrix.org/rddVQBTjOOmNkNLXWfYJNfPW
 
     # Whether or not to receive ephemeral events via appservice transactions.
     # Requires MSC2409 support (i.e. Synapse 1.22+).
@@ -78,6 +78,8 @@ bridge:
     # Whether the bridge should send error notices via m.notice events when a message fails to bridge.
     message_error_notices: true
     portal_message_buffer: 128
+    # Enable redaction
+    allow_redaction: false
     # Should puppet avatars be fetched from the server even if an avatar is already set?
     user_avatar_sync: true
     # Should the bridge sync with double puppeting to receive EDUs that aren't normally sent to appservices.

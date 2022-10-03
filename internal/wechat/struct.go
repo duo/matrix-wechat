@@ -33,6 +33,7 @@ const (
 	EventLocation = "m.location"
 	EventNotice   = "m.notice"
 	EventApp      = "m.app"
+	EventRevoke   = "m.revoke"
 )
 
 type UserInfo struct {

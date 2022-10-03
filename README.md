@@ -57,7 +57,7 @@ Some quick links:
     * [x] Private
     * [x] Group
   * [ ] Presence
-  * [ ] Redaction
+  * [x] Redaction
   * [ ] Group actions
     * [ ] Invite
     * [ ] Join
