@@ -17,5 +17,5 @@ if [[ ! -f /data/registration.yaml ]]; then
 	exit
 fi
 
-cd /data
-/usr/bin/matrix-wechat
+cd /data && exec /usr/bin/matrix-wechat
+exit 1
