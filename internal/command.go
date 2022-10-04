@@ -19,6 +19,8 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
+const maxCheckCount = 5
+
 type WrappedCommandEvent struct {
 	*commands.Event
 	Bridge *WechatBridge
@@ -113,6 +115,7 @@ func fnLogin(ce *WrappedCommandEvent) {
 			stopChecker := make(chan struct{})
 			ce.Bridge.checkers[ce.User.MXID] = stopChecker
 			go func() {
+				count := 0
 				clock := time.NewTicker(time.Minute)
 				defer func() {
 					ce.User.log.Infoln("Checker stopped.")
@@ -123,9 +126,14 @@ func fnLogin(ce *WrappedCommandEvent) {
 					select {
 					case <-clock.C:
 						if !ce.User.IsLoggedIn() {
-							ce.User.DeleteConnection()
-							ce.Reply("You're not logged into Wechat.")
-							return
+							if count == maxCheckCount {
+								ce.User.DeleteConnection()
+								ce.Reply("You're not logged into Wechat.")
+								return
+							}
+							count += 1
+						} else {
+							count = 0
 						}
 					case <-stopChecker:
 						return
