@@ -22,7 +22,7 @@ func NewWechatClient(mxid string, service *WechatService, handler func(*Websocke
 		mxid:    mxid,
 		service: service,
 		hanlder: handler,
-		log:     service.log.Sub("Client"),
+		log:     service.log.Sub("Client").Sub(mxid),
 	}
 }
 

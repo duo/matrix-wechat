@@ -222,6 +222,10 @@ func (p *Portal) handleFakeMessage(msg fakeMessage) {
 }
 
 func (p *Portal) handleWechatRevoke(source *User, msgID uint64, operator string) {
+	if !p.bridge.Config.Bridge.AllowRedaction {
+		return
+	}
+
 	msg := p.bridge.DB.Message.GetByMsgID(p.Key, strconv.FormatUint(msgID, 10))
 	if msg == nil || msg.IsFakeMXID() {
 		return
