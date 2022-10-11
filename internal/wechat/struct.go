@@ -40,6 +40,7 @@ type UserInfo struct {
 	ID        string `json:"wxId"`
 	Nickname  string `json:"wxNickName"`
 	BigAvatar string `json:"wxBigAvatar"`
+	Remark    string `json:"wxRemark"`
 }
 
 type GroupInfo struct {

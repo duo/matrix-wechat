@@ -177,7 +177,7 @@ func (u *User) doPuppetResync() {
 		u.log.Debugfln("Doing background sync for user: %v", puppet.UID)
 		info := u.Client.GetUserInfo(puppet.UID.Uin)
 		if info != nil {
-			puppet.Sync(u, types.NewContact(info.ID, info.Nickname), true, true)
+			puppet.Sync(u, types.NewContact(info.ID, info.Nickname, info.Remark), true, true)
 		} else {
 			u.log.Warnfln("Failed to get contact info for %s in background sync", puppet.UID)
 		}
@@ -467,7 +467,7 @@ func (u *User) ResyncContacts(forceAvatarSync bool) error {
 		uid := types.NewUserUID(contact.ID)
 		puppet := u.bridge.GetPuppetByUID(uid)
 		if puppet != nil {
-			puppet.Sync(u, types.NewContact(contact.ID, contact.Nickname), forceAvatarSync, true)
+			puppet.Sync(u, types.NewContact(contact.ID, contact.Nickname, contact.Remark), forceAvatarSync, true)
 		} else {
 			u.log.Warnfln("Got a nil puppet for %s while syncing contacts", uid)
 		}

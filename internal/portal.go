@@ -639,7 +639,7 @@ func (p *Portal) UpdateRoomNickname(source *User, wxid string) {
 	puppet := p.bridge.GetPuppetByUID(types.NewUserUID(wxid))
 
 	roomNickname, _ := p.bridge.Config.Bridge.FormatDisplayname(
-		*types.NewContact(wxid, groupNickname),
+		*types.NewContact(wxid, groupNickname, groupNickname),
 	)
 	memberContent := puppet.IntentFor(p).Member(p.MXID, puppet.MXID)
 	if memberContent.Displayname != roomNickname {

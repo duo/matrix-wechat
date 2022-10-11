@@ -148,7 +148,7 @@ func (p *Puppet) updatePortalName() {
 func (p *Puppet) SyncContact(source *User, forceAvatarSync bool, reason string) {
 	info := source.Client.GetUserInfo(p.UID.Uin)
 	if info != nil {
-		p.Sync(source, types.NewContact(info.ID, info.Nickname), forceAvatarSync, false)
+		p.Sync(source, types.NewContact(info.ID, info.Nickname, info.Remark), forceAvatarSync, false)
 	} else {
 		p.log.Warnfln("No contact info found through %s in SyncContact (sync reason: %s)", source.MXID, reason)
 	}
