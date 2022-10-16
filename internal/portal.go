@@ -213,7 +213,7 @@ func (p *Portal) handleFakeMessage(msg fakeMessage) {
 	resp, err := p.sendMessage(intent, event.EventMessage, &event.MessageEventContent{
 		MsgType: msgType,
 		Body:    msg.Text,
-	}, nil, msg.Time.UnixMilli())
+	}, nil, msg.Time.Unix())
 	if err != nil {
 		p.log.Errorfln("Failed to send %s to Matrix: %v", msg.ID, err)
 	} else {
@@ -293,6 +293,15 @@ func (p *Portal) handleWechatMessage(source *User, msg *wechat.WebsocketMessage)
 		p.UpdateTopic(msg.Content, types.EmptyUID, false)
 	case wechat.EventApp:
 		converted = p.convertWechatApp(source, msg, intent)
+	case wechat.EventVoIP:
+		p.handleFakeMessage(fakeMessage{
+			Sender:    sender,
+			Text:      msg.Content,
+			ID:        msgID,
+			Time:      time.Unix(ts, 0),
+			Important: false,
+		})
+		return
 	}
 
 	if len(msg.Reply.Sender) > 0 {
