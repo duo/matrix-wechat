@@ -182,7 +182,7 @@ func (br *WechatBridge) ParsePuppetMXID(mxid id.UserID) (types.UID, bool) {
 	var uid types.UID
 	if userIDRegex == nil {
 		userIDRegex = regexp.MustCompile(fmt.Sprintf("^@%s:%s$",
-			br.Config.Bridge.FormatUsername("([a-zA-Z0-9-_]+)"),
+			br.Config.Bridge.FormatUsername("(.+)"),
 			br.Config.Homeserver.Domain))
 	}
 	match := userIDRegex.FindStringSubmatch(string(mxid))

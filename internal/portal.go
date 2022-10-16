@@ -284,11 +284,7 @@ func (p *Portal) handleWechatMessage(source *User, msg *wechat.WebsocketMessage)
 
 	switch msg.EventType {
 	case wechat.EventText:
-		var mentions []string
-		err := json.Unmarshal(msg.Extra, &mentions)
-		if err == nil && len(mentions) > 0 {
-			converted = p.convertWechatMentions(source, msg, intent)
-		}
+		converted = p.convertWechatText(source, msg, intent)
 	case wechat.EventImage, wechat.EventVideo, wechat.EventAudio, wechat.EventFile:
 		converted = p.convertWechatMedia(source, msg, intent)
 	case wechat.EventLocation:
@@ -319,36 +315,47 @@ func (p *Portal) handleWechatMessage(source *User, msg *wechat.WebsocketMessage)
 	}
 }
 
-func (p *Portal) convertWechatMentions(source *User, msg *wechat.WebsocketMessage, intent *appservice.IntentAPI) *ConvertedMessage {
+func (p *Portal) convertWechatText(source *User, msg *wechat.WebsocketMessage, intent *appservice.IntentAPI) *ConvertedMessage {
+	var content *event.MessageEventContent
+
+	emotionCotent := ReplaceEmotion(msg.Content)
+
+	content = &event.MessageEventContent{
+		Body:    emotionCotent,
+		MsgType: event.MsgText,
+	}
+
 	var mentions []string
-	json.Unmarshal(msg.Extra, &mentions)
+	err := json.Unmarshal(msg.Extra, &mentions)
+	if err == nil && len(mentions) > 0 {
+		formattedBody := emotionCotent
+		var formattedHead string
 
-	formattedBody := msg.Content
-	var formattedHead string
+		// TODO: notify all?
+		for _, mention := range mentions {
+			mxid, name := p.bridge.Formatter.GetMatrixInfoByUID(p.MXID, types.NewUserUID(mention))
+			groupNickname := source.Client.GetGroupMemberNickname(p.Key.UID.Uin, mention)
+			original := "@" + groupNickname
+			replacement := fmt.Sprintf(`<a href="https://matrix.to/#/%s">%s</a> `, mxid, name)
 
-	// TODO: notify all?
-	for _, mention := range mentions {
-		mxid, name := p.bridge.Formatter.GetMatrixInfoByUID(p.MXID, types.NewUserUID(mention))
-		groupNickname := source.Client.GetGroupMemberNickname(p.Key.UID.Uin, mention)
-		original := "@" + groupNickname
-		replacement := fmt.Sprintf(`<a href="https://matrix.to/#/%s">%s</a> `, mxid, name)
+			if len(groupNickname) > 0 && strings.Contains(emotionCotent, original) {
+				formattedBody = strings.ReplaceAll(formattedBody, original, replacement)
+			} else {
+				formattedHead += replacement
+			}
+		}
+		if len(formattedHead) > 0 {
+			formattedHead += "<br> "
+		}
 
-		if len(groupNickname) > 0 && strings.Contains(msg.Content, original) {
-			formattedBody = strings.ReplaceAll(formattedBody, original, replacement)
-		} else {
-			formattedHead += replacement
+		content = &event.MessageEventContent{
+			MsgType:       event.MsgText,
+			Format:        event.FormatHTML,
+			Body:          msg.Content,
+			FormattedBody: formattedHead + formattedBody,
 		}
 	}
-	if len(formattedHead) > 0 {
-		formattedHead += "<br> "
-	}
 
-	content := &event.MessageEventContent{
-		MsgType:       event.MsgText,
-		Format:        event.FormatHTML,
-		Body:          msg.Content,
-		FormattedBody: formattedHead + formattedBody,
-	}
 	converted := &ConvertedMessage{
 		Intent:  intent,
 		Type:    event.EventMessage,
