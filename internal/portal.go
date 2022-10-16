@@ -293,7 +293,7 @@ func (p *Portal) handleWechatMessage(source *User, msg *wechat.WebsocketMessage)
 		p.UpdateTopic(msg.Content, types.EmptyUID, false)
 	case wechat.EventApp:
 		converted = p.convertWechatApp(source, msg, intent)
-	case wechat.EventVoIP:
+	case wechat.EventVoIP, wechat.EventSystem:
 		p.handleFakeMessage(fakeMessage{
 			Sender:    sender,
 			Text:      msg.Content,

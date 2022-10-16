@@ -35,6 +35,7 @@ const (
 	EventApp      = "m.app"
 	EventRevoke   = "m.revoke"
 	EventVoIP     = "m.voip"
+	EventSystem   = "m.system"
 )
 
 type UserInfo struct {
