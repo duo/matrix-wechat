@@ -27,7 +27,7 @@ func main() {
 		Name:         "matrix-wechat",
 		URL:          "https://github.com/duo/matrix-wechat",
 		Description:  "A Matrix-Wechat puppeting bridge.",
-		Version:      "0.0.11",
+		Version:      "0.0.12",
 		ProtocolName: "Wechat",
 
 		CryptoPickleKey: "github.com/duo/matrix-wechat",

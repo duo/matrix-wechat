@@ -104,6 +104,7 @@ type fakeMessage struct {
 	ID        string
 	Time      time.Time
 	Important bool
+	ReplyTo   *ReplyInfo
 }
 
 type recentlyHandledWrapper struct {
@@ -209,11 +210,16 @@ func (p *Portal) handleFakeMessage(msg fakeMessage) {
 	if msg.Important {
 		msgType = event.MsgText
 	}
-
-	resp, err := p.sendMessage(intent, event.EventMessage, &event.MessageEventContent{
+	content := &event.MessageEventContent{
 		MsgType: msgType,
 		Body:    msg.Text,
-	}, nil, msg.Time.Unix())
+	}
+
+	if msg.ReplyTo != nil {
+		p.SetReply(content, msg.ReplyTo)
+	}
+
+	resp, err := p.sendMessage(intent, event.EventMessage, content, nil, msg.Time.Unix())
 	if err != nil {
 		p.log.Errorfln("Failed to send %s to Matrix: %v", msg.ID, err)
 	} else {
@@ -221,17 +227,28 @@ func (p *Portal) handleFakeMessage(msg fakeMessage) {
 	}
 }
 
-func (p *Portal) handleWechatRevoke(source *User, msgID uint64, operator string) {
+func (p *Portal) handleWechatRevoke(source *User, message *wechat.WebsocketMessage) {
+	msgID := strconv.FormatUint(message.ID, 10)
+
 	if !p.bridge.Config.Bridge.AllowRedaction {
+		p.handleFakeMessage(fakeMessage{
+			Sender:    types.NewUserUID(message.Sender),
+			Text:      message.Content,
+			ID:        "FAKE::" + msgID,
+			Time:      time.Unix(message.Timestamp, 0),
+			Important: false,
+			ReplyTo:   &ReplyInfo{MessageID: msgID},
+		})
+
 		return
 	}
 
-	msg := p.bridge.DB.Message.GetByMsgID(p.Key, strconv.FormatUint(msgID, 10))
+	msg := p.bridge.DB.Message.GetByMsgID(p.Key, msgID)
 	if msg == nil || msg.IsFakeMXID() {
 		return
 	}
 
-	intent := p.bridge.GetPuppetByUID(types.NewUserUID(operator)).IntentFor(p)
+	intent := p.bridge.GetPuppetByUID(types.NewUserUID(message.Sender)).IntentFor(p)
 	_, err := intent.RedactEvent(p.MXID, msg.MXID)
 	if err != nil {
 		if errors.Is(err, mautrix.MForbidden) {
@@ -258,7 +275,7 @@ func (p *Portal) handleWechatMessage(source *User, msg *wechat.WebsocketMessage)
 	existingMsg := p.bridge.DB.Message.GetByMsgID(p.Key, msgID)
 	if existingMsg != nil {
 		if msg.EventType == wechat.EventRevoke {
-			p.handleWechatRevoke(source, msg.ID, msg.Sender)
+			p.handleWechatRevoke(source, msg)
 		} else {
 			p.log.Debugfln("Not handling %s: message is duplicate", msgID)
 		}
@@ -297,7 +314,7 @@ func (p *Portal) handleWechatMessage(source *User, msg *wechat.WebsocketMessage)
 		p.handleFakeMessage(fakeMessage{
 			Sender:    sender,
 			Text:      msg.Content,
-			ID:        msgID,
+			ID:        "FAKE::" + msgID,
 			Time:      time.Unix(ts, 0),
 			Important: false,
 		})
