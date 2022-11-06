@@ -219,7 +219,7 @@ func (p *Portal) handleFakeMessage(msg fakeMessage) {
 		p.SetReply(content, msg.ReplyTo)
 	}
 
-	resp, err := p.sendMessage(intent, event.EventMessage, content, nil, msg.Time.Unix())
+	resp, err := p.sendMessage(intent, event.EventMessage, content, nil, msg.Time.UnixMilli())
 	if err != nil {
 		p.log.Errorfln("Failed to send %s to Matrix: %v", msg.ID, err)
 	} else {
@@ -235,7 +235,7 @@ func (p *Portal) handleWechatRevoke(source *User, message *wechat.WebsocketMessa
 			Sender:    types.NewUserUID(message.Sender),
 			Text:      message.Content,
 			ID:        "FAKE::" + msgID,
-			Time:      time.Unix(message.Timestamp, 0),
+			Time:      time.UnixMilli(message.Timestamp),
 			Important: false,
 			ReplyTo:   &ReplyInfo{MessageID: msgID},
 		})
@@ -315,7 +315,7 @@ func (p *Portal) handleWechatMessage(source *User, msg *wechat.WebsocketMessage)
 			Sender:    sender,
 			Text:      msg.Content,
 			ID:        "FAKE::" + msgID,
-			Time:      time.Unix(ts, 0),
+			Time:      time.UnixMilli(ts),
 			Important: false,
 		})
 		return
@@ -337,7 +337,7 @@ func (p *Portal) handleWechatMessage(source *User, msg *wechat.WebsocketMessage)
 	}
 
 	if len(eventID) != 0 {
-		p.finishHandling(existingMsg, msgID, time.Unix(ts, 0), sender, eventID, database.MsgNormal, converted.Error)
+		p.finishHandling(existingMsg, msgID, time.UnixMilli(ts), sender, eventID, database.MsgNormal, converted.Error)
 	}
 }
 
@@ -1436,7 +1436,7 @@ func (p *Portal) HandleMatrixMessage(sender *User, evt *event.Event) {
 		p.log.Warnfln("Sending event", evt.ID, "to Wechat failed")
 	} else {
 		// TODO: get msgID from Wechat
-		p.finishHandling(nil, msgID, time.Unix(evt.Timestamp, 0), sender.UID, evt.ID, database.MsgNormal, database.MsgNoError)
+		p.finishHandling(nil, msgID, time.UnixMilli(evt.Timestamp), sender.UID, evt.ID, database.MsgNormal, database.MsgNoError)
 	}
 }
 
