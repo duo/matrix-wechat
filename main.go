@@ -26,7 +26,7 @@ func main() {
 	br.Bridge = bridge.Bridge{
 		Name:         "matrix-wechat",
 		URL:          "https://github.com/duo/matrix-wechat",
-		Description:  "A Matrix-Wechat puppeting bridge.",
+		Description:  "A Matrix-WeChat puppeting bridge.",
 		Version:      "0.1.0",
 		ProtocolName: "Wechat",
 

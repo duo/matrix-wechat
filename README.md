@@ -1,5 +1,5 @@
 # matrix-wechat
-A Matrix-Wechat puppeting bridge based on [mautrix-go](https://github.com/mautrix/go).
+A Matrix-WeChat puppeting bridge based on [mautrix-go](https://github.com/mautrix/go).
 
 ### Documentation
 
@@ -12,7 +12,7 @@ Some quick links:
 
 ### Features & roadmap
 
-* Matrix → Wechat
+* Matrix → WeChat
   * [ ] Message types
     * [x] Text
 	* [x] Image
@@ -42,7 +42,7 @@ Some quick links:
     * [ ] Name
     * [ ] Avatar
 
-* Wechat → Matrix
+* WeChat → Matrix
   * [ ] Message types
     * [x] Text
     * [x] Image

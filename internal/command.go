@@ -67,7 +67,7 @@ var cmdLogin = &commands.FullHandler{
 	Name: "login",
 	Help: commands.HelpMeta{
 		Section:     commands.HelpSectionAuth,
-		Description: "Link the bridge to your Wechat account.",
+		Description: "Link the bridge to your WeChat account.",
 	},
 }
 
@@ -128,7 +128,7 @@ func fnLogin(ce *WrappedCommandEvent) {
 						if !ce.User.IsLoggedIn() {
 							if count == maxCheckCount {
 								ce.User.DeleteConnection()
-								ce.Reply("You're not logged into Wechat.")
+								ce.Reply("You're not logged into WeChat.")
 								return
 							}
 							count += 1
@@ -190,20 +190,20 @@ var cmdLogout = &commands.FullHandler{
 	Name: "logout",
 	Help: commands.HelpMeta{
 		Section:     commands.HelpSectionAuth,
-		Description: "Unlink the bridge from your Wechat account.",
+		Description: "Unlink the bridge from your WeChat account.",
 	},
 }
 
 func fnLogout(ce *WrappedCommandEvent) {
 	if !ce.User.IsLoggedIn() {
-		ce.Reply("You are not connected to Wechat.")
+		ce.Reply("You are not connected to WeChat.")
 		return
 	}
 	puppet := ce.Bridge.GetPuppetByUID(ce.User.UID)
 	if puppet.CustomMXID != "" {
 		err := puppet.SwitchCustomMXID("", "")
 		if err != nil {
-			ce.User.log.Warnln("Failed to logout-matrix while logging out of Wechat:", err)
+			ce.User.log.Warnln("Failed to logout-matrix while logging out of WeChat:", err)
 		}
 	}
 	ce.User.Client.Disconnect()
@@ -218,15 +218,15 @@ var cmdPing = &commands.FullHandler{
 	Name: "ping",
 	Help: commands.HelpMeta{
 		Section:     HelpSectionConnectionManagement,
-		Description: "Check your connection to Wechat.",
+		Description: "Check your connection to WeChat.",
 	},
 }
 
 func fnPing(ce *WrappedCommandEvent) {
 	if ce.User.IsLoggedIn() {
-		ce.Reply("Logged in as %s, connection to Wechat OK (probably)", ce.User.UID.Uin)
+		ce.Reply("Logged in as %s, connection to WeChat OK (probably)", ce.User.UID.Uin)
 	} else {
-		ce.Reply("You're not logged into Wechat.")
+		ce.Reply("You're not logged into WeChat.")
 	}
 }
 
@@ -484,7 +484,7 @@ var cmdSync = &commands.FullHandler{
 	Name: "sync",
 	Help: commands.HelpMeta{
 		Section:     HelpSectionMiscellaneous,
-		Description: "Synchronize data from Wechat.",
+		Description: "Synchronize data from WeChat.",
 		Args:        "<contacts/groups/space> [--contact-avatars] [--create-portals]",
 	},
 	RequiresLogin: true,

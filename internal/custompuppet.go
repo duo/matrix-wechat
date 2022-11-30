@@ -56,8 +56,8 @@ func (p *Puppet) loginWithSharedSecret(mxid id.UserID) (string, error) {
 	}
 	req := mautrix.ReqLogin{
 		Identifier:               mautrix.UserIdentifier{Type: mautrix.IdentifierTypeUser, User: string(mxid)},
-		DeviceID:                 "Wechat Bridge",
-		InitialDeviceDisplayName: "Wechat Bridge",
+		DeviceID:                 "WeChat Bridge",
+		InitialDeviceDisplayName: "WeChat Bridge",
 	}
 	if loginSecret == "appservice" {
 		client.AccessToken = p.bridge.AS.Registration.AppToken

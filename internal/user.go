@@ -231,8 +231,8 @@ func (u *User) GetSpaceRoom() id.RoomID {
 
 		resp, err := u.bridge.Bot.CreateRoom(&mautrix.ReqCreateRoom{
 			Visibility: "private",
-			Name:       "Wechat",
-			Topic:      "Your Wechat bridged chats",
+			Name:       "WeChat",
+			Topic:      "Your WeChat bridged chats",
 			InitialState: []*event.Event{{
 				Type: event.StateRoomAvatar,
 				Content: event.Content{
@@ -280,7 +280,7 @@ func (u *User) GetManagementRoom() id.RoomID {
 			creationContent["m.federate"] = false
 		}
 		resp, err := u.bridge.Bot.CreateRoom(&mautrix.ReqCreateRoom{
-			Topic:           "Wechat bridge notices",
+			Topic:           "WeChat bridge notices",
 			IsDirect:        true,
 			CreationContent: creationContent,
 		})
@@ -307,7 +307,7 @@ func (u *User) SetManagementRoom(roomID id.RoomID) {
 }
 
 func (u *User) failedConnect(err error) {
-	u.log.Warnln("Error connecting to Wechat:", err)
+	u.log.Warnln("Error connecting to WeChat:", err)
 	u.Client.Disconnect()
 	u.BridgeState.Send(status.BridgeState{
 		StateEvent: status.StateUnknownError,
