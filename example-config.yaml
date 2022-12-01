@@ -52,7 +52,7 @@ appservice:
         username: wechatbot
         # Display name and avatar for bot. Set to "remove" to remove display name/avatar, leave empty
         # to leave display name/avatar as-is.
-        displayname: Wechat bridge bot
+        displayname: WeChat bridge bot
         avatar: mxc://matrix.org/rddVQBTjOOmNkNLXWfYJNfPW
 
     # Whether or not to receive ephemeral events via appservice transactions.
@@ -66,11 +66,11 @@ appservice:
 
 # Bridge config
 bridge:
-    # Localpart template of MXIDs for Wechat users.
+    # Localpart template of MXIDs for WeChat users.
     username_template: _wechat_{{.}}
-    # Displayname template for Wechat users.
-    displayname_template: "{{if .Name}}{{.Name}}{{else}}{{.Uin}}{{end}} (Wechat)"
-    # Wechat listen address (for agent connection)
+    # Displayname template for WeChat users.
+    displayname_template: "{{if .Name}}{{.Name}}{{else}}{{.Uin}}{{end}} (WeChat)"
+    # WeChat listen address (for agent connection)
     listen_address: "0.0.0.0:20002"
     listen_secret: foobar
     # Should the bridge create a space for each logged-in user and add bridged rooms to it?
@@ -95,9 +95,9 @@ bridge:
     # presence is bridged. These settings set the default values.
     # Existing users won't be affected when these are changed.
     default_bridge_presence: false
-    # Send the presence as "available" to Wechat when users start typing on a portal.
+    # Send the presence as "available" to WeChat when users start typing on a portal.
     # This works as a workaround for homeservers that do not support presence, and allows
-    # users to see when the Wechat user on the other side is typing during a conversation.
+    # users to see when the WeChat user on the other side is typing during a conversation.
     send_presence_on_typing: false
     # Servers to always allow double puppeting from
     double_puppet_server_map:
@@ -120,7 +120,7 @@ bridge:
     resend_bridge_info: false
     # When using double puppeting, should muted chats be muted in Matrix?
     mute_bridging: false
-    # Allow invite permission for user. User can invite any bots to room with Wechat
+    # Allow invite permission for user. User can invite any bots to room with WeChat
     # users (private chat and groups)
     allow_user_invite: false
     # Whether or not created rooms should have federation enabled.
@@ -147,7 +147,7 @@ bridge:
     # Markdown is supported. The defaults are listed below.
     management_room_text:
         # Sent when joining a room.
-        welcome: "Hello, I'm a Wechat bridge bot."
+        welcome: "Hello, I'm a WeChat bridge bot."
         # Sent when joining a management room and the user is already logged in.
         welcome_connected: "Use `help` for help."
         # Sent when joining a management room and the user is not logged in.
@@ -183,7 +183,7 @@ bridge:
         #   verified - Require manual per-device verification
         #              (currently only possible by modifying the `trust` column in the `crypto_device` database table).
         verification_levels:
-            # Minimum level for which the bridge should send keys to when bridging messages from Wechat to Matrix.
+            # Minimum level for which the bridge should send keys to when bridging messages from WeChat to Matrix.
             receive: unverified
             # Minimum level that the bridge should accept for incoming Matrix messages.
             send: unverified
@@ -209,7 +209,7 @@ bridge:
 
     # Permissions for using the bridge.
     # Permitted values:
-    #     user - Access to use the bridge to chat with a Wechat account.
+    #     user - Access to use the bridge to chat with a WeChat account.
     #    admin - User level and some additional administration tools
     # Permitted keys:
     #        * - All Matrix users

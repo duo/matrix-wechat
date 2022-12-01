@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	PrivateChatTopic      = "Wechat private chat"
+	PrivateChatTopic      = "WeChat private chat"
 	recentlyHandledLength = 100
 )
 
@@ -579,7 +579,7 @@ func (p *Portal) kickExtraUsers(participantMap map[types.UID]bool) {
 			if !shouldBePresent {
 				_, err = p.MainIntent().KickUser(p.MXID, &mautrix.ReqKickUser{
 					UserID: member,
-					Reason: "User had left this Wechat chat",
+					Reason: "User had left this WeChat chat",
 				})
 				if err != nil {
 					p.log.Warnfln("Failed to kick user %s who had left: %v", member, err)
@@ -965,7 +965,7 @@ func (p *Portal) getBridgeInfo() (string, event.BridgeEventContent) {
 		Creator:   p.MainIntent().UserID,
 		Protocol: event.BridgeInfoSection{
 			ID:          "wechat",
-			DisplayName: "Wechat",
+			DisplayName: "WeChat",
 			AvatarURL:   p.bridge.Config.AppService.Bot.ParsedAvatar.CUString(),
 			ExternalURL: "https://www.wechat.com/",
 		},
@@ -1431,11 +1431,11 @@ func (p *Portal) HandleMatrixMessage(sender *User, evt *event.Event) {
 	}
 
 	msgID := "FAKE::" + strconv.FormatInt(evt.Timestamp, 10)
-	p.log.Debugln("Sending event", evt.ID, "to Wechat")
+	p.log.Debugln("Sending event", evt.ID, "to WeChat")
 	if err := sender.Client.SendMessage(msg); err != nil {
-		p.log.Warnfln("Sending event", evt.ID, "to Wechat failed")
+		p.log.Warnfln("Sending event", evt.ID, "to WeChat failed")
 	} else {
-		// TODO: get msgID from Wechat
+		// TODO: get msgID from WeChat
 		p.finishHandling(nil, msgID, time.UnixMilli(evt.Timestamp), sender.UID, evt.ID, database.MsgNormal, database.MsgNoError)
 	}
 }

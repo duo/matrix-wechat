@@ -14,9 +14,9 @@ const (
 func init() {
 	status.BridgeStateHumanErrors.Update(status.BridgeStateErrorMap{
 		WechatLoggedOut:        "You were logged out from another device. Relogin to continue using the bridge.",
-		WechatNotConnected:     "You're not connected to Wechat.",
-		WechatConnecting:       "Reconnecting to Wechat...",
-		WechatConnectionFailed: "Connect to the Wechat servers failed.",
+		WechatNotConnected:     "You're not connected to WeChat.",
+		WechatConnecting:       "Reconnecting to WeChat...",
+		WechatConnectionFailed: "Connect to the WeChat servers failed.",
 	})
 }
 
