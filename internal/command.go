@@ -351,8 +351,8 @@ func formatContacts(bridge *WechatBridge, input []*wechat.UserInfo, query string
 		uid := types.NewUserUID(contact.ID)
 		puppet := bridge.GetPuppetByUID(uid)
 
-		if !hasQuery || matchesQuery(contact.Nickname, query) || matchesQuery(uid.Uin, query) {
-			result = append(result, fmt.Sprintf("* %s(https://matrix.to/#/%s) - `%s`", contact.Nickname, puppet.MXID, uid.Uin))
+		if !hasQuery || matchesQuery(contact.Nickname, query) || matchesQuery(contact.Remark, query) || matchesQuery(uid.Uin, query) {
+			result = append(result, fmt.Sprintf("* %s / [%s](https://matrix.to/#/%s) - `%s`", contact.Nickname, contact.Remark, puppet.MXID, uid.Uin))
 		}
 	}
 	sort.Strings(result)
