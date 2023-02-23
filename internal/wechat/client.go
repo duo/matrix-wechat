@@ -1,230 +1,173 @@
 package wechat
 
 import (
-	"context"
-	"time"
+	"sync"
 
 	log "maunium.net/go/maulogger/v2"
 )
 
-const requestTimeout = 30 * time.Second
-
 type WechatClient struct {
-	mxid    string
-	service *WechatService
-	hanlder func(*WebsocketMessage)
+	mxid string
 
 	log log.Logger
+
+	processFunc func(*Event)
+	requestFunc func(*WechatClient, *Request) (any, error)
+
+	connKey     string
+	connKeyLock sync.RWMutex
 }
 
-func NewWechatClient(mxid string, service *WechatService, handler func(*WebsocketMessage)) *WechatClient {
+func newWechatClient(mxid string, f func(*WechatClient, *Request) (any, error), log log.Logger) *WechatClient {
 	return &WechatClient{
-		mxid:    mxid,
-		service: service,
-		hanlder: handler,
-		log:     service.log.Sub("Client").Sub(mxid),
+		mxid:        mxid,
+		requestFunc: f,
+		log:         log.Sub("Client").Sub(mxid),
 	}
 }
 
-func (c *WechatClient) Login() error {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
-
-	return c.service.RequestWebsocket(ctx, &WebsocketRequest{
-		MXID:    c.mxid,
-		Command: CommandConnect,
-	}, nil)
+func (wc *WechatClient) SetProcessFunc(f func(*Event)) {
+	wc.processFunc = f
 }
 
-func (c *WechatClient) Disconnect() {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
-
-	c.service.RequestWebsocket(ctx, &WebsocketRequest{
-		MXID:    c.mxid,
-		Command: CommandDisconnect,
-	}, nil)
-
-	c.service.RemoveClient(c.mxid)
+func (wc *WechatClient) Login() error {
+	_, err := wc.requestFunc(wc, &Request{
+		Type: ReqConnect,
+	})
+	return err
 }
 
-func (c *WechatClient) LoginWithQRCode() []byte {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
+func (wc *WechatClient) Disconnect() {
+	wc.requestFunc(wc, &Request{
+		Type: ReqDisconnect,
+	})
+}
 
-	var data []byte
-	err := c.service.RequestWebsocket(ctx, &WebsocketRequest{
-		MXID:    c.mxid,
-		Command: CommandLoginWithQRCode,
-	}, &data)
-
-	if err != nil {
-		c.log.Warnln("Failed to login with QR code:", err)
+func (wc *WechatClient) LoginWithQRCode() []byte {
+	if data, err := wc.requestFunc(wc, &Request{
+		Type: ReqLoginQR,
+	}); err != nil {
+		wc.log.Warnln("Failed to login with QR code:", err)
 		return nil
+	} else {
+		return data.([]byte)
 	}
-
-	return data
 }
 
-func (c *WechatClient) IsLoggedIn() bool {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
-
-	var data IsLoginData
-	err := c.service.RequestWebsocket(ctx, &WebsocketRequest{
-		MXID:    c.mxid,
-		Command: CommandIsLogin,
-	}, &data)
-
-	if err != nil {
-		c.log.Warnln("Failed to get login status:", err)
+func (wc *WechatClient) IsLoggedIn() bool {
+	if data, err := wc.requestFunc(wc, &Request{
+		Type: ReqIsLogin,
+	}); err != nil {
+		wc.log.Warnln("Failed to get login status:", err)
 		return false
+	} else {
+		return data.(bool)
 	}
-
-	return data.Status
 }
 
-func (c *WechatClient) GetSelf() *UserInfo {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
-
-	var data UserInfo
-	err := c.service.RequestWebsocket(ctx, &WebsocketRequest{
-		MXID:    c.mxid,
-		Command: CommandGetSelf,
-	}, &data)
-
-	if err != nil {
-		c.log.Warnln("Failed to get self info:", err)
+func (wc *WechatClient) GetSelf() *UserInfo {
+	if data, err := wc.requestFunc(wc, &Request{
+		Type: ReqGetSelf,
+	}); err != nil {
+		wc.log.Warnln("Failed to get self info:", err)
 		return nil
+	} else {
+		return data.(*UserInfo)
 	}
-
-	return &data
 }
 
-func (c *WechatClient) GetUserInfo(wxid string) *UserInfo {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
-
-	var data UserInfo
-	err := c.service.RequestWebsocket(ctx, &WebsocketRequest{
-		MXID:    c.mxid,
-		Command: CommandGetUserInfo,
-		Data:    &QueryData{ID: wxid},
-	}, &data)
-
-	if err != nil {
-		c.log.Warnln("Failed to get user info:", err)
+func (wc *WechatClient) GetUserInfo(wxid string) *UserInfo {
+	if data, err := wc.requestFunc(wc, &Request{
+		Type: ReqGetUserInfo,
+		Data: []string{wxid},
+	}); err != nil {
+		wc.log.Warnln("Failed to get user info:", err)
 		return nil
+	} else {
+		return data.(*UserInfo)
 	}
-
-	return &data
 }
 
-func (c *WechatClient) GetGroupInfo(wxid string) *GroupInfo {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
-
-	var data GroupInfo
-	err := c.service.RequestWebsocket(ctx, &WebsocketRequest{
-		MXID:    c.mxid,
-		Command: CommandGetGroupInfo,
-		Data:    &QueryData{ID: wxid},
-	}, &data)
-
-	if err != nil {
-		c.log.Warnln("Failed to get group info:", err)
+func (wc *WechatClient) GetGroupInfo(wxid string) *GroupInfo {
+	if data, err := wc.requestFunc(wc, &Request{
+		Type: ReqGetGroupInfo,
+		Data: []string{wxid},
+	}); err != nil {
+		wc.log.Warnln("Failed to get group info:", err)
 		return nil
+	} else {
+		return data.(*GroupInfo)
 	}
-
-	return &data
 }
 
-func (c *WechatClient) GetGroupMembers(wxid string) []string {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
-
-	var data []string
-	err := c.service.RequestWebsocket(ctx, &WebsocketRequest{
-		MXID:    c.mxid,
-		Command: CommandGetGroupMembers,
-		Data:    &QueryData{ID: wxid},
-	}, &data)
-
-	if err != nil {
-		c.log.Warnln("Failed to get group info:", err)
+func (wc *WechatClient) GetGroupMembers(wxid string) []string {
+	if data, err := wc.requestFunc(wc, &Request{
+		Type: ReqGetGroupMembers,
+		Data: []string{wxid},
+	}); err != nil {
+		wc.log.Warnln("Failed to get group members:", err)
 		return nil
+	} else {
+		return data.([]string)
 	}
-
-	return data
 }
 
-func (c *WechatClient) GetGroupMemberNickname(group, wxid string) string {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
-
-	var data string
-	err := c.service.RequestWebsocket(ctx, &WebsocketRequest{
-		MXID:    c.mxid,
-		Command: CommandGetGroupMemberNickname,
-		Data:    &QueryData{ID: wxid, Group: group},
-	}, &data)
-
-	if err != nil {
-		c.log.Warnln("Failed to get group member nickname:", err)
+func (wc *WechatClient) GetGroupMemberNickname(group, wxid string) string {
+	if data, err := wc.requestFunc(wc, &Request{
+		Type: ReqGetGroupMemberNickname,
+		Data: []string{group, wxid},
+	}); err != nil {
+		wc.log.Warnln("Failed to get group member nickname:", err)
 		return ""
+	} else {
+		return data.(string)
 	}
-
-	return data
 }
 
-func (c *WechatClient) GetFriendList() []*UserInfo {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
-
-	var friends []*UserInfo
-	err := c.service.RequestWebsocket(ctx, &WebsocketRequest{
-		MXID:    c.mxid,
-		Command: CommandGetFriendList,
-	}, &friends)
-
-	if err != nil {
-		c.log.Warnln("Failed to get friend list:", err)
-		return []*UserInfo{}
+func (wc *WechatClient) GetFriendList() []*UserInfo {
+	if data, err := wc.requestFunc(wc, &Request{
+		Type: ReqGetFriendList,
+	}); err != nil {
+		wc.log.Warnln("Failed to get friend list:", err)
+		return nil
+	} else {
+		return data.([]*UserInfo)
 	}
-
-	return friends
 }
 
-func (c *WechatClient) GetGroupList() []*GroupInfo {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
-
-	var groups []*GroupInfo
-	err := c.service.RequestWebsocket(ctx, &WebsocketRequest{
-		MXID:    c.mxid,
-		Command: CommandGetGroupList,
-	}, &groups)
-
-	if err != nil {
-		c.log.Warnln("Failed to get group list:", err)
-		return []*GroupInfo{}
+func (wc *WechatClient) GetGroupList() []*GroupInfo {
+	if data, err := wc.requestFunc(wc, &Request{
+		Type: ReqGetGroupList,
+	}); err != nil {
+		wc.log.Warnln("Failed to get group list:", err)
+		return nil
+	} else {
+		return data.([]*GroupInfo)
 	}
-
-	return groups
 }
 
-func (c *WechatClient) SendMessage(msg *MatrixMessage) error {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
-
-	return c.service.RequestWebsocket(ctx, &WebsocketRequest{
-		MXID:    c.mxid,
-		Command: CommandSendMessage,
-		Data:    msg,
-	}, nil)
+func (wc *WechatClient) SendEvent(event *Event) (*Event, error) {
+	if data, err := wc.requestFunc(wc, &Request{
+		Type: ReqEvent,
+		Data: event,
+	}); err != nil {
+		wc.log.Warnfln("Failed to send event:", err)
+		return nil, err
+	} else {
+		return data.(*Event), nil
+	}
 }
 
-func (c *WechatClient) HandleEvent(msg *WebsocketMessage) {
-	c.hanlder(msg)
+func (wc *WechatClient) getConnKey() string {
+	wc.connKeyLock.RLock()
+	defer wc.connKeyLock.RUnlock()
+
+	return wc.connKey
+}
+
+func (wc *WechatClient) setConnKey(key string) {
+	wc.connKeyLock.Lock()
+	defer wc.connKeyLock.Unlock()
+
+	wc.connKey = key
 }

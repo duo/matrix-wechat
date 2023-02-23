@@ -1,11 +1,10 @@
 package internal
 
 import (
-	"bytes"
 	"compress/gzip"
-	"encoding/binary"
 	"io"
 	"net/http"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -152,82 +151,80 @@ var (
 )
 
 const sampleRate = 24000
-const numChannels = 1
-const precision = 2
 
-type waveHeader struct {
-	RiffMark      [4]byte
-	FileSize      int32
-	WaveMark      [4]byte
-	FmtMark       [4]byte
-	FormatSize    int32
-	FormatType    int16
-	NumChans      int16
-	SampleRate    int32
-	ByteRate      int32
-	BytesPerFrame int16
-	BitsPerSample int16
-	DataMark      [4]byte
-	DataSize      int32
-}
-
-func convertToOgg(rawData []byte) ([]byte, error) {
+func silk2ogg(rawData []byte) ([]byte, error) {
 	pcmData, err := silk.DecodeSilkBuffToPcm(rawData, sampleRate)
 	if err != nil {
 		return nil, err
 	}
 
-	header := waveHeader{
-		RiffMark:      [4]byte{'R', 'I', 'F', 'F'},
-		FileSize:      int32(44 + len(pcmData)),
-		WaveMark:      [4]byte{'W', 'A', 'V', 'E'},
-		FmtMark:       [4]byte{'f', 'm', 't', ' '},
-		FormatSize:    16,
-		FormatType:    1,
-		NumChans:      int16(numChannels),
-		SampleRate:    int32(sampleRate),
-		ByteRate:      int32(sampleRate * numChannels * precision),
-		BytesPerFrame: int16(numChannels * precision),
-		BitsPerSample: int16(precision) * 8,
-		DataMark:      [4]byte{'d', 'a', 't', 'a'},
-		DataSize:      int32(len(pcmData)),
-	}
-
-	buf := &bytes.Buffer{}
-	if err := binary.Write(buf, binary.LittleEndian, &header); err != nil {
-		return nil, err
-	}
-	if _, err := buf.Write(pcmData); err != nil {
-		return nil, err
-	}
-
-	cmd := exec.Command(
-		"ffmpeg", "-i", "pipe:0", "-c:a", "libopus", "-b:a", "24K", "-f", "ogg", "pipe:1",
-	)
-	stdin, err := cmd.StdinPipe()
+	pcmFile, err := os.CreateTemp("", "pcm-")
 	if err != nil {
 		return nil, err
 	}
-	stdout, err := cmd.StdoutPipe()
+	defer os.Remove(pcmFile.Name())
+	os.WriteFile(pcmFile.Name(), pcmData, 0o644)
+
+	wavFile, err := os.CreateTemp("", "wav-")
 	if err != nil {
 		return nil, err
 	}
-
-	if err := cmd.Start(); err != nil {
-		return nil, err
+	defer os.Remove(wavFile.Name())
+	{
+		cmd := exec.Command(
+			"ffmpeg", "-f", "s16le", "-ar", "24000", "-ac", "1", "-vol", "2000", "-y", "-i", pcmFile.Name(), "-f", "wav", wavFile.Name())
+		if err := cmd.Start(); err != nil {
+			return nil, err
+		}
+		if err := cmd.Wait(); err != nil {
+			return nil, err
+		}
 	}
 
-	io.Copy(stdin, buf)
-	stdin.Close()
-
-	outputBuf := &bytes.Buffer{}
-	io.Copy(outputBuf, stdout)
-
-	if err := cmd.Wait(); err != nil {
+	oggFile, err := os.CreateTemp("", "ogg-")
+	if err != nil {
 		return nil, err
 	}
+	defer os.Remove(oggFile.Name())
+	{
+		cmd := exec.Command(
+			"ffmpeg", "-y", "-i", wavFile.Name(), "-c:a", "libopus", "-b:a", "24K", "-f", "ogg", oggFile.Name())
+		if err := cmd.Start(); err != nil {
+			return nil, err
+		}
 
-	return outputBuf.Bytes(), nil
+		if err := cmd.Wait(); err != nil {
+			return nil, err
+		}
+	}
+
+	return os.ReadFile(oggFile.Name())
+}
+
+func ogg2mp3(rawData []byte) ([]byte, error) {
+	oggFile, err := os.CreateTemp("", "ogg-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(oggFile.Name())
+	os.WriteFile(oggFile.Name(), rawData, 0o644)
+
+	mp3File, err := os.CreateTemp("", "mp3-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(mp3File.Name())
+	{
+		cmd := exec.Command("ffmpeg", "-y", "-i", oggFile.Name(), "-f", "mp3", mp3File.Name())
+		if err := cmd.Start(); err != nil {
+			return nil, err
+		}
+		if err := cmd.Wait(); err != nil {
+			return nil, err
+		}
+	}
+
+	return os.ReadFile(mp3File.Name())
 }
 
 func GetBytes(url string) ([]byte, error) {

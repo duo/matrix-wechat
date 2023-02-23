@@ -345,14 +345,14 @@ func matchesQuery(str string, query string) bool {
 func formatContacts(bridge *WechatBridge, input []*wechat.UserInfo, query string) (result []string) {
 	hasQuery := len(query) > 0
 	for _, contact := range input {
-		if len(contact.Nickname) == 0 {
+		if len(contact.Name) == 0 {
 			continue
 		}
 		uid := types.NewUserUID(contact.ID)
 		puppet := bridge.GetPuppetByUID(uid)
 
-		if !hasQuery || matchesQuery(contact.Nickname, query) || matchesQuery(contact.Remark, query) || matchesQuery(uid.Uin, query) {
-			result = append(result, fmt.Sprintf("* %s / [%s](https://matrix.to/#/%s) - `%s`", contact.Nickname, contact.Remark, puppet.MXID, uid.Uin))
+		if !hasQuery || matchesQuery(contact.Name, query) || matchesQuery(contact.Remark, query) || matchesQuery(uid.Uin, query) {
+			result = append(result, fmt.Sprintf("* %s / [%s](https://matrix.to/#/%s) - `%s`", contact.Name, contact.Remark, puppet.MXID, uid.Uin))
 		}
 	}
 	sort.Strings(result)

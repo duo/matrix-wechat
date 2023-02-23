@@ -78,7 +78,7 @@ func (br *WechatBridge) Init() {
 	br.WechatService = wechat.NewWechatService(
 		br.Config.Bridge.ListenAddress,
 		br.Config.Bridge.ListenSecret,
-		br.Log.Sub("Wechat"),
+		br.Log,
 	)
 }
 
@@ -107,6 +107,10 @@ func (br *WechatBridge) Stop() {
 }
 
 func (br *WechatBridge) StartUsers() {
+	br.Log.Debugln("Starting users")
+	for _, user := range br.GetAllUsers() {
+		user.InitClient()
+	}
 	br.Log.Debugln("Starting custom puppets")
 	for _, loopuppet := range br.GetAllPuppetsWithCustomMXID() {
 		go func(puppet *Puppet) {

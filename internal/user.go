@@ -177,7 +177,7 @@ func (u *User) doPuppetResync() {
 		u.log.Debugfln("Doing background sync for user: %v", puppet.UID)
 		info := u.Client.GetUserInfo(puppet.UID.Uin)
 		if info != nil {
-			puppet.Sync(u, types.NewContact(info.ID, info.Nickname, info.Remark), true, true)
+			puppet.Sync(u, types.NewContact(info.ID, info.Name, info.Remark), true, true)
 		} else {
 			u.log.Warnfln("Failed to get contact info for %s in background sync", puppet.UID)
 		}
@@ -319,6 +319,13 @@ func (u *User) failedConnect(err error) {
 	u.BridgeState.Send(status.BridgeState{StateEvent: status.StateUnknownError, Error: WechatConnectionFailed})
 }
 
+func (u *User) InitClient() {
+	if u.Client == nil {
+		u.Client = u.bridge.WechatService.NewClient(string(u.MXID))
+		u.Client.SetProcessFunc(u.processEvent)
+	}
+}
+
 func (u *User) Login() error {
 	u.connLock.Lock()
 	defer u.connLock.Unlock()
@@ -330,7 +337,8 @@ func (u *User) Login() error {
 	}
 
 	u.BridgeState.Send(status.BridgeState{StateEvent: status.StateConnecting, Error: WechatConnecting})
-	u.Client = u.bridge.WechatService.CreateClient(string(u.MXID), u.handleMessage)
+
+	u.InitClient()
 
 	err := u.Client.Login()
 	if err != nil {
@@ -467,7 +475,7 @@ func (u *User) ResyncContacts(forceAvatarSync bool) error {
 		uid := types.NewUserUID(contact.ID)
 		puppet := u.bridge.GetPuppetByUID(uid)
 		if puppet != nil {
-			puppet.Sync(u, types.NewContact(contact.ID, contact.Nickname, contact.Remark), forceAvatarSync, true)
+			puppet.Sync(u, types.NewContact(contact.ID, contact.Name, contact.Remark), forceAvatarSync, true)
 		} else {
 			u.log.Warnfln("Got a nil puppet for %s while syncing contacts", uid)
 		}
@@ -517,11 +525,11 @@ func (u *User) updateAvatar(uid types.UID, avatarID *string, avatarURL *id.Conte
 	var url string
 	if uid.IsUser() {
 		if info := u.Client.GetUserInfo(uid.Uin); info != nil {
-			url = info.BigAvatar
+			url = info.Avatar
 		}
 	} else {
 		if info := u.Client.GetGroupInfo(uid.Uin); info != nil {
-			url = info.BigAvatar
+			url = info.Avatar
 		}
 	}
 
@@ -542,20 +550,20 @@ func (u *User) updateAvatar(uid types.UID, avatarID *string, avatarURL *id.Conte
 	return true
 }
 
-func (u *User) handleMessage(m *wechat.WebsocketMessage) {
-	if strings.HasSuffix(m.Target, "@chatroom") { // Group
-		uid := types.NewGroupUID(m.Target)
+func (u *User) processEvent(e *wechat.Event) {
+	if strings.HasSuffix(e.Chat.ID, "@chatroom") { // Group
+		uid := types.NewGroupUID(e.Chat.ID)
 		portal := u.bridge.GetPortalByUID(database.NewPortalKey(uid, u.UID))
-		portal.messages <- PortalMessage{event: m, source: u}
+		portal.messages <- PortalMessage{event: e, source: u}
 	} else {
 		var key database.PortalKey
-		if m.Sender == u.UID.Uin {
-			key = database.NewPortalKey(types.NewUserUID(m.Target), types.NewUserUID(m.Sender))
+		if e.From.ID == u.UID.Uin {
+			key = database.NewPortalKey(types.NewUserUID(e.Chat.ID), types.NewUserUID(e.From.ID))
 		} else {
-			key = database.NewPortalKey(types.NewUserUID(m.Sender), types.NewUserUID(m.Target))
+			key = database.NewPortalKey(types.NewUserUID(e.From.ID), types.NewUserUID(e.Chat.ID))
 		}
 		portal := u.bridge.GetPortalByUID(key)
-		portal.messages <- PortalMessage{event: m, source: u}
+		portal.messages <- PortalMessage{event: e, source: u}
 	}
 }
 
