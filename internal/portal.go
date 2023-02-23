@@ -3,9 +3,11 @@ package internal
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"image"
+	"math/rand"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -1348,7 +1350,7 @@ func (p *Portal) HandleMatrixMessage(sender *User, evt *event.Event) {
 
 	target := p.Key.UID.Uin
 
-	replyToID := content.GetReplyTo()
+	replyToID := content.RelatesTo.GetReplyTo()
 	// TODO: how to reply
 	var replyMention string
 	if len(replyToID) > 0 {
@@ -1407,7 +1409,7 @@ func (p *Portal) HandleMatrixMessage(sender *User, evt *event.Event) {
 		if len(mentions) > 0 {
 			msg.Mentions = mentions
 		}
-	case event.MsgImage, event.MsgVideo, event.MsgFile:
+	case event.MsgImage, event.MsgAudio, event.MsgVideo, event.MsgFile:
 		name, data, err := p.preprocessMatrixMedia(content)
 		if data == nil {
 			notice := fmt.Sprintf("Failed to process matrix media: %v", err)
@@ -1422,6 +1424,20 @@ func (p *Portal) HandleMatrixMessage(sender *User, evt *event.Event) {
 		}
 		if content.MsgType == event.MsgImage {
 			msg.Data = []*wechat.BlobData{blob}
+		} else if content.MsgType == event.MsgAudio {
+			if binary, err := ogg2mp3(data); err != nil {
+				notice := fmt.Sprintf("Failed to convert audio to mp3: %v", err)
+				p.log.Warnfln(notice)
+				p.replyFailure(sender, evt, notice)
+				return
+			} else {
+				randBytes := make([]byte, 4)
+				rand.Read(randBytes)
+				msg.Data = &wechat.BlobData{
+					Name:   fmt.Sprintf("VOICE_%s.mp3", hex.EncodeToString(randBytes)),
+					Binary: binary,
+				}
+			}
 		} else {
 			msg.Data = blob
 		}
