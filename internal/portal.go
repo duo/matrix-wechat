@@ -1433,6 +1433,7 @@ func (p *Portal) HandleMatrixMessage(sender *User, evt *event.Event) {
 			} else {
 				randBytes := make([]byte, 4)
 				rand.Read(randBytes)
+				msg.Type = wechat.EventFile
 				msg.Data = &wechat.BlobData{
 					Name:   fmt.Sprintf("VOICE_%s.mp3", hex.EncodeToString(randBytes)),
 					Binary: binary,

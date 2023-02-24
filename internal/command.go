@@ -19,7 +19,7 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
-const maxCheckCount = 5
+const loginTimeout = 2 * time.Minute
 
 type WrappedCommandEvent struct {
 	*commands.Event
@@ -77,19 +77,10 @@ func fnLogin(ce *WrappedCommandEvent) {
 		return
 	}
 
-	ce.Bridge.checkersLock.Lock()
-	if checker, ok := ce.Bridge.checkers[ce.User.MXID]; ok {
-		select {
-		case checker <- struct{}{}:
-		default:
-		}
-	}
-	ce.Bridge.checkersLock.Unlock()
-
-	err := ce.User.Login()
+	err := ce.User.Connect()
 	if err != nil {
-		ce.User.log.Errorf("Failed to log in:", err)
-		ce.Reply("Failed to log in: %v", err)
+		ce.User.log.Errorf("Failed to connect:", err)
+		ce.Reply("Failed to connect: %v", err)
 		return
 	}
 
@@ -104,43 +95,12 @@ func fnLogin(ce *WrappedCommandEvent) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), loginTimeout)
 	defer cancel()
 
 	for {
 		if ce.User.IsLoggedIn() {
 			ce.User.MarkLogin()
-
-			ce.Bridge.checkersLock.Lock()
-			stopChecker := make(chan struct{})
-			ce.Bridge.checkers[ce.User.MXID] = stopChecker
-			go func() {
-				count := 0
-				clock := time.NewTicker(time.Minute)
-				defer func() {
-					ce.User.log.Infoln("Checker stopped.")
-					clock.Stop()
-				}()
-				ce.User.log.Infoln("Check WeChat login status every minute.")
-				for {
-					select {
-					case <-clock.C:
-						if !ce.User.IsLoggedIn() {
-							if count == maxCheckCount {
-								ce.User.DeleteConnection()
-								ce.Reply("You're not logged into WeChat.")
-								return
-							}
-							count += 1
-						} else {
-							count = 0
-						}
-					case <-stopChecker:
-						return
-					}
-				}
-			}()
-			ce.Bridge.checkersLock.Unlock()
 
 			_, _ = ce.Bot.RedactEvent(ce.RoomID, qrEventID)
 			ce.Reply("Login successful.")
@@ -150,7 +110,7 @@ func fnLogin(ce *WrappedCommandEvent) {
 		select {
 		case <-time.After(5 * time.Second):
 		case <-ctx.Done():
-			ce.Reply("Timed out. Please restart the login.")
+			ce.Reply("Timedout, Please restart the login.")
 			return
 		}
 	}
@@ -206,7 +166,6 @@ func fnLogout(ce *WrappedCommandEvent) {
 			ce.User.log.Warnln("Failed to logout-matrix while logging out of WeChat:", err)
 		}
 	}
-	ce.User.Client.Disconnect()
 	ce.User.removeFromUIDMap(status.BridgeState{StateEvent: status.StateLoggedOut})
 	ce.User.DeleteConnection()
 	ce.User.DeleteSession()

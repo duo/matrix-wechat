@@ -95,8 +95,11 @@ func (ws *WechatService) NewClient(mxid string) *WechatClient {
 	ws.clientsLock.Lock()
 	defer ws.clientsLock.Unlock()
 
-	client := newWechatClient(mxid, ws.request, ws.log)
-	ws.clients[mxid] = client
+	client, ok := ws.clients[mxid]
+	if !ok {
+		client = newWechatClient(mxid, ws.request, ws.log)
+		ws.clients[mxid] = client
+	}
 
 	return client
 }

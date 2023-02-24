@@ -30,17 +30,18 @@ func (wc *WechatClient) SetProcessFunc(f func(*Event)) {
 	wc.processFunc = f
 }
 
-func (wc *WechatClient) Login() error {
+func (wc *WechatClient) Connect() error {
 	_, err := wc.requestFunc(wc, &Request{
 		Type: ReqConnect,
 	})
 	return err
 }
 
-func (wc *WechatClient) Disconnect() {
-	wc.requestFunc(wc, &Request{
+func (wc *WechatClient) Disconnect() error {
+	_, err := wc.requestFunc(wc, &Request{
 		Type: ReqDisconnect,
 	})
+	return err
 }
 
 func (wc *WechatClient) LoginWithQRCode() []byte {
