@@ -35,4 +35,4 @@ jobs:
             linux/arm64
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/matrix-wechat:${{ github.ref_name }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/matrix-wechat:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/matrix-wechat:2
