@@ -27,6 +27,8 @@ func ToMessageType(t EventType) event.MessageType {
 		return event.MsgText
 	case EventPhoto:
 		return event.MsgImage
+	case EventSticker:
+		return event.MsgImage
 	case EventAudio:
 		return event.MsgAudio
 	case EventVideo:

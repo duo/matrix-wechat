@@ -233,7 +233,7 @@ func (o *Event) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		o.Data = photos
-	case EventAudio, EventVideo, EventFile:
+	case EventSticker, EventAudio, EventVideo, EventFile:
 		var blob *BlobData
 		if err := json.Unmarshal(rawMsg, &blob); err != nil {
 			return err
@@ -299,6 +299,7 @@ const (
 const (
 	EventText EventType = iota
 	EventPhoto
+	EventSticker
 	EventAudio
 	EventVideo
 	EventFile
@@ -410,6 +411,8 @@ func (t EventType) String() string {
 		return "text"
 	case EventPhoto:
 		return "photo"
+	case EventSticker:
+		return "sticker"
 	case EventAudio:
 		return "audio"
 	case EventVideo:

@@ -303,7 +303,7 @@ func (p *Portal) handleWechatEvent(source *User, msg *wechat.Event) {
 	switch msg.Type {
 	case wechat.EventText:
 		converted = p.convertWechatText(source, msg, intent)
-	case wechat.EventPhoto, wechat.EventVideo, wechat.EventAudio, wechat.EventFile:
+	case wechat.EventPhoto, wechat.EventSticker, wechat.EventVideo, wechat.EventAudio, wechat.EventFile:
 		converted = p.convertWechatMedia(source, msg, intent)
 	case wechat.EventLocation:
 		converted = p.convertWechatLocation(source, msg, intent)
