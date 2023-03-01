@@ -78,7 +78,7 @@ func (br *WechatBridge) Init() {
 	br.WechatService = wechat.NewWechatService(
 		br.Config.Bridge.ListenAddress,
 		br.Config.Bridge.ListenSecret,
-		br.Log.Sub("Wechat"),
+		br.Log,
 	)
 }
 
@@ -88,20 +88,24 @@ func (br *WechatBridge) Start() {
 }
 
 func (br *WechatBridge) Stop() {
+	br.checkersLock.Lock()
 	for _, checker := range br.checkers {
 		select {
 		case checker <- struct{}{}:
 		default:
 		}
 	}
+	br.checkersLock.Unlock()
 
+	br.usersLock.Lock()
 	for _, user := range br.usersByUsername {
 		if user.Client == nil {
 			continue
 		}
 		br.Log.Debugln("Disconnecting", user.MXID)
-		user.Client.Disconnect()
+		user.DeleteConnection()
 	}
+	br.usersLock.Unlock()
 
 	br.WechatService.Stop()
 }

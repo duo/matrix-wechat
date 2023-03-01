@@ -3,10 +3,11 @@ package internal
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"image"
+	"math/rand"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -52,7 +53,7 @@ var (
 )
 
 type PortalMessage struct {
-	event  *wechat.WebsocketMessage
+	event  *wechat.Event
 	fake   *fakeMessage
 	source *User
 }
@@ -151,7 +152,7 @@ func (p *Portal) handleWechatMessageLoopItem(msg PortalMessage) {
 
 	switch {
 	case msg.event != nil:
-		p.handleWechatMessage(msg.source, msg.event)
+		p.handleWechatEvent(msg.source, msg.event)
 	case msg.fake != nil:
 		msg.fake.ID = "FAKE::" + msg.fake.ID
 		p.handleFakeMessage(*msg.fake)
@@ -227,12 +228,12 @@ func (p *Portal) handleFakeMessage(msg fakeMessage) {
 	}
 }
 
-func (p *Portal) handleWechatRevoke(source *User, message *wechat.WebsocketMessage) {
-	msgID := strconv.FormatUint(message.ID, 10)
+func (p *Portal) handleWechatRevoke(source *User, message *wechat.Event) {
+	msgID := message.ID
 
 	if !p.bridge.Config.Bridge.AllowRedaction {
 		p.handleFakeMessage(fakeMessage{
-			Sender:    types.NewUserUID(message.Sender),
+			Sender:    types.NewUserUID(message.From.ID),
 			Text:      message.Content,
 			ID:        "FAKE::" + msgID,
 			Time:      time.UnixMilli(message.Timestamp),
@@ -248,7 +249,7 @@ func (p *Portal) handleWechatRevoke(source *User, message *wechat.WebsocketMessa
 		return
 	}
 
-	intent := p.bridge.GetPuppetByUID(types.NewUserUID(message.Sender)).IntentFor(p)
+	intent := p.bridge.GetPuppetByUID(types.NewUserUID(message.From.ID)).IntentFor(p)
 	_, err := intent.RedactEvent(p.MXID, msg.MXID)
 	if err != nil {
 		if errors.Is(err, mautrix.MForbidden) {
@@ -262,19 +263,19 @@ func (p *Portal) handleWechatRevoke(source *User, message *wechat.WebsocketMessa
 	}
 }
 
-func (p *Portal) handleWechatMessage(source *User, msg *wechat.WebsocketMessage) {
+func (p *Portal) handleWechatEvent(source *User, msg *wechat.Event) {
 	if len(p.MXID) == 0 {
-		p.log.Warnln("handleWechatMessage called even though portal.MXID is empty")
+		p.log.Warnln("handleWechatEvent called even though portal.MXID is empty")
 		return
 	}
 
 	msgID := fmt.Sprint(msg.ID)
-	sender := types.NewUserUID(msg.Sender)
+	sender := types.NewUserUID(msg.From.ID)
 	ts := msg.Timestamp
 
 	existingMsg := p.bridge.DB.Message.GetByMsgID(p.Key, msgID)
 	if existingMsg != nil {
-		if msg.EventType == wechat.EventRevoke {
+		if msg.Type == wechat.EventRevoke {
 			p.handleWechatRevoke(source, msg)
 		} else {
 			p.log.Debugfln("Not handling %s: message is duplicate", msgID)
@@ -299,10 +300,10 @@ func (p *Portal) handleWechatMessage(source *User, msg *wechat.WebsocketMessage)
 		},
 	}
 
-	switch msg.EventType {
+	switch msg.Type {
 	case wechat.EventText:
 		converted = p.convertWechatText(source, msg, intent)
-	case wechat.EventImage, wechat.EventVideo, wechat.EventAudio, wechat.EventFile:
+	case wechat.EventPhoto, wechat.EventSticker, wechat.EventVideo, wechat.EventAudio, wechat.EventFile:
 		converted = p.convertWechatMedia(source, msg, intent)
 	case wechat.EventLocation:
 		converted = p.convertWechatLocation(source, msg, intent)
@@ -321,9 +322,9 @@ func (p *Portal) handleWechatMessage(source *User, msg *wechat.WebsocketMessage)
 		return
 	}
 
-	if len(msg.Reply.Sender) > 0 {
+	if msg.Reply != nil {
 		p.SetReply(converted.Content, &ReplyInfo{
-			MessageID: strconv.FormatUint(msg.Reply.ID, 10),
+			MessageID: msg.Reply.ID,
 			Sender:    types.NewUserUID(msg.Reply.Sender),
 		})
 	}
@@ -341,7 +342,7 @@ func (p *Portal) handleWechatMessage(source *User, msg *wechat.WebsocketMessage)
 	}
 }
 
-func (p *Portal) convertWechatText(source *User, msg *wechat.WebsocketMessage, intent *appservice.IntentAPI) *ConvertedMessage {
+func (p *Portal) convertWechatText(source *User, msg *wechat.Event, intent *appservice.IntentAPI) *ConvertedMessage {
 	var content *event.MessageEventContent
 
 	emotionCotent := ReplaceEmotion(msg.Content)
@@ -351,14 +352,12 @@ func (p *Portal) convertWechatText(source *User, msg *wechat.WebsocketMessage, i
 		MsgType: event.MsgText,
 	}
 
-	var mentions []string
-	err := json.Unmarshal(msg.Extra, &mentions)
-	if err == nil && len(mentions) > 0 {
+	if len(msg.Mentions) > 0 {
 		formattedBody := emotionCotent
 		var formattedHead string
 
 		// TODO: notify all?
-		for _, mention := range mentions {
+		for _, mention := range msg.Mentions {
 			mxid, name := p.bridge.Formatter.GetMatrixInfoByUID(p.MXID, types.NewUserUID(mention))
 			groupNickname := source.Client.GetGroupMemberNickname(p.Key.UID.Uin, mention)
 			original := "@" + groupNickname
@@ -391,23 +390,25 @@ func (p *Portal) convertWechatText(source *User, msg *wechat.WebsocketMessage, i
 	return converted
 }
 
-func (p *Portal) convertWechatMedia(source *User, msg *wechat.WebsocketMessage, intent *appservice.IntentAPI) *ConvertedMessage {
+func (p *Portal) convertWechatMedia(source *User, msg *wechat.Event, intent *appservice.IntentAPI) *ConvertedMessage {
 	msgID := fmt.Sprint(msg.ID)
 
 	converted := &ConvertedMessage{
 		Intent: intent,
 	}
 
-	var data wechat.BlobData
-	err := json.Unmarshal(msg.Extra, &data)
-	if err != nil {
-		return p.makeMediaBridgeFailureMessage(msgID, errors.New("failed to decode wechat media"), converted)
+	var err error
+	var data *wechat.BlobData
+
+	if msg.Type == wechat.EventPhoto {
+		data = msg.Data.([]*wechat.BlobData)[0]
+	} else {
+		data = msg.Data.(*wechat.BlobData)
 	}
 
 	binary := data.Binary
-	if msg.EventType == "m.audio" {
-		binary, err = convertToOgg(data.Binary)
-		if err != nil {
+	if msg.Type == wechat.EventAudio {
+		if binary, err = silk2ogg(data.Binary); err != nil {
 			return p.makeMediaBridgeFailureMessage(msgID, errors.New("failed to convert silk audio to ogg format"), converted)
 		}
 	}
@@ -415,7 +416,7 @@ func (p *Portal) convertWechatMedia(source *User, msg *wechat.WebsocketMessage, 
 	mime := mimetype.Detect(binary)
 
 	content := &event.MessageEventContent{
-		MsgType: event.MessageType(msg.EventType),
+		MsgType: wechat.ToMessageType(msg.Type),
 		Info: &event.FileInfo{
 			MimeType: mime.String(),
 			Size:     len(binary),
@@ -439,18 +440,12 @@ func (p *Portal) convertWechatMedia(source *User, msg *wechat.WebsocketMessage, 
 	return converted
 }
 
-func (p *Portal) convertWechatLocation(source *User, msg *wechat.WebsocketMessage, intent *appservice.IntentAPI) *ConvertedMessage {
-	msgID := fmt.Sprint(msg.ID)
-
+func (p *Portal) convertWechatLocation(source *User, msg *wechat.Event, intent *appservice.IntentAPI) *ConvertedMessage {
 	converted := &ConvertedMessage{
 		Intent: intent,
 	}
 
-	var data wechat.LocationData
-	err := json.Unmarshal(msg.Extra, &data)
-	if err != nil {
-		return p.makeMediaBridgeFailureMessage(msgID, errors.New("failed to decode wechat location"), converted)
-	}
+	data := msg.Data.(*wechat.LocationData)
 
 	url := fmt.Sprintf("https://maps.google.com/?q=%.5f,%.5f", data.Latitude, data.Longitude)
 
@@ -468,18 +463,12 @@ func (p *Portal) convertWechatLocation(source *User, msg *wechat.WebsocketMessag
 	return converted
 }
 
-func (p *Portal) convertWechatApp(source *User, msg *wechat.WebsocketMessage, intent *appservice.IntentAPI) *ConvertedMessage {
-	msgID := fmt.Sprint(msg.ID)
-
+func (p *Portal) convertWechatApp(source *User, msg *wechat.Event, intent *appservice.IntentAPI) *ConvertedMessage {
 	converted := &ConvertedMessage{
 		Intent: intent,
 	}
 
-	var data wechat.LinkData
-	err := json.Unmarshal(msg.Extra, &data)
-	if err != nil {
-		return p.makeMediaBridgeFailureMessage(msgID, errors.New("failed to decode wechat link"), converted)
-	}
+	data := msg.Data.(*wechat.AppData)
 
 	var body string
 	if len(data.URL) > 0 {
@@ -1353,13 +1342,15 @@ func (p *Portal) HandleMatrixMessage(sender *User, evt *event.Event) {
 
 	content, ok := evt.Content.Parsed.(*event.MessageEventContent)
 	if !ok {
-		p.log.Warnfln("Failed to parse matrix message content")
+		notice := "Failed to parse matrix message content"
+		p.log.Warnfln(notice)
+		p.replyFailure(sender, evt, notice)
 		return
 	}
 
 	target := p.Key.UID.Uin
 
-	replyToID := content.GetReplyTo()
+	replyToID := content.RelatesTo.GetReplyTo()
 	// TODO: how to reply
 	var replyMention string
 	if len(replyToID) > 0 {
@@ -1373,13 +1364,17 @@ func (p *Portal) HandleMatrixMessage(sender *User, evt *event.Event) {
 		content.MsgType = event.MsgImage
 	}
 
-	msg := &wechat.MatrixMessage{
-		Target: target,
+	msg := &wechat.Event{
+		ID:        string(evt.ID),
+		Timestamp: evt.Timestamp,
+		From:      wechat.User{ID: sender.User.UID.Uin},
+		Chat:      wechat.Chat{ID: target},
 	}
+
 	switch content.MsgType {
 	case event.MsgText, event.MsgEmote:
 		var mentions []string
-		msg.MessageType = string(event.MsgText)
+		msg.Type = wechat.EventText
 		text := content.Body
 
 		if content.Format == event.FormatHTML {
@@ -1402,7 +1397,7 @@ func (p *Portal) HandleMatrixMessage(sender *User, evt *event.Event) {
 		if len(replyMention) > 0 {
 			if info := sender.Client.GetUserInfo(replyMention); info != nil {
 				mentions = append([]string{replyMention}, mentions...)
-				text = fmt.Sprintf("@%s %s", info.Nickname, text)
+				text = fmt.Sprintf("@%s %s", info.Name, text)
 			}
 		}
 
@@ -1412,28 +1407,52 @@ func (p *Portal) HandleMatrixMessage(sender *User, evt *event.Event) {
 
 		msg.Content = text
 		if len(mentions) > 0 {
-			msg.Data = mentions
+			msg.Mentions = mentions
 		}
-	case event.MsgImage, event.MsgVideo, event.MsgFile:
+	case event.MsgImage, event.MsgAudio, event.MsgVideo, event.MsgFile:
 		name, data, err := p.preprocessMatrixMedia(content)
 		if data == nil {
-			p.log.Warnfln("Failed to process matrix media: %v", err)
+			notice := fmt.Sprintf("Failed to process matrix media: %v", err)
+			p.log.Warnfln(notice)
+			p.replyFailure(sender, evt, notice)
 			return
 		}
-		msg.MessageType = string(content.MsgType)
-		msg.Data = &wechat.BlobData{
+		msg.Type = wechat.ToEventType(content.MsgType)
+		blob := &wechat.BlobData{
 			Name:   name,
 			Binary: data,
 		}
+		if content.MsgType == event.MsgImage {
+			msg.Data = []*wechat.BlobData{blob}
+		} else if content.MsgType == event.MsgAudio {
+			if binary, err := ogg2mp3(data); err != nil {
+				notice := fmt.Sprintf("Failed to convert audio to mp3: %v", err)
+				p.log.Warnfln(notice)
+				p.replyFailure(sender, evt, notice)
+				return
+			} else {
+				randBytes := make([]byte, 4)
+				rand.Read(randBytes)
+				msg.Type = wechat.EventFile
+				msg.Data = &wechat.BlobData{
+					Name:   fmt.Sprintf("VOICE_%s.mp3", hex.EncodeToString(randBytes)),
+					Binary: binary,
+				}
+			}
+		} else {
+			msg.Data = blob
+		}
 	default:
-		p.log.Warnfln("%s not support", content.MsgType)
+		notice := fmt.Sprintf("%s not support", content.MsgType)
+		p.log.Warnfln(notice)
+		p.replyFailure(sender, evt, notice)
 		return
 	}
 
 	msgID := "FAKE::" + strconv.FormatInt(evt.Timestamp, 10)
 	p.log.Debugln("Sending event", evt.ID, "to WeChat")
-	if err := sender.Client.SendMessage(msg); err != nil {
-		p.log.Warnfln("Sending event", evt.ID, "to WeChat failed")
+	if _, err := sender.Client.SendEvent(msg); err != nil {
+		p.replyFailure(sender, evt, err.Error())
 	} else {
 		// TODO: get msgID from WeChat
 		p.finishHandling(nil, msgID, time.UnixMilli(evt.Timestamp), sender.UID, evt.ID, database.MsgNormal, database.MsgNoError)
@@ -1446,6 +1465,38 @@ func (p *Portal) HandleMatrixRedaction(sender *User, evt *event.Event) {
 
 func (p *Portal) HandleMatrixReaction(sender *User, evt *event.Event) {
 	// TODO:
+}
+
+func (p *Portal) replyFailure(sender *User, evt *event.Event, text string) {
+	intent := p.bridge.Bot
+	if p.IsPrivateChat() && !p.IsEncrypted() {
+		i := p.bridge.GetPuppetByUID(sender.UID).IntentFor(p)
+		if !i.IsCustomPuppet && sender.UID.Uin == p.Key.Receiver.Uin {
+			intent = p.MainIntent()
+		} else {
+			intent = i
+		}
+	}
+
+	content := &event.MessageEventContent{
+		MsgType: event.MsgNotice,
+		Body:    text,
+	}
+
+	_ = evt.Content.ParseRaw(evt.Type)
+	if evt.Type == event.EventEncrypted {
+		decryptedEvt, err := p.bridge.Crypto.Decrypt(evt)
+		if err != nil {
+			p.log.Warnln("Failed to decrypt reply target:", err)
+		} else {
+			evt = decryptedEvt
+		}
+	}
+	content.SetReply(evt)
+
+	if _, err := p.sendMessage(intent, event.EventMessage, content, nil, 0); err != nil {
+		p.log.Warnfln("Failed to reply to failure for %s: %v", sender.GetMXID(), err)
+	}
 }
 
 func (p *Portal) canBridgeFrom(sender *User) error {

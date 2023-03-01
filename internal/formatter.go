@@ -26,11 +26,11 @@ func NewFormatter(br *WechatBridge) *Formatter {
 				if mxid[0] == '@' {
 					puppet := br.GetPuppetByMXID(id.UserID(mxid))
 					if puppet != nil {
-						uids, ok := ctx[mentionedUIDsContextKey].([]string)
+						uids, ok := ctx.ReturnData[mentionedUIDsContextKey].([]string)
 						if !ok {
-							ctx[mentionedUIDsContextKey] = []string{puppet.UID.Uin}
+							ctx.ReturnData[mentionedUIDsContextKey] = []string{puppet.UID.Uin}
 						} else {
-							ctx[mentionedUIDsContextKey] = append(uids, puppet.UID.Uin)
+							ctx.ReturnData[mentionedUIDsContextKey] = append(uids, puppet.UID.Uin)
 						}
 						return "@" + puppet.UID.Uin
 					}
@@ -61,8 +61,8 @@ func (f *Formatter) GetMatrixInfoByUID(roomID id.RoomID, uid types.UID) (id.User
 }
 
 func (f *Formatter) ParseMatrix(html string) (string, []string) {
-	ctx := make(format.Context)
+	ctx := format.NewContext()
 	result := f.matrixHTMLParser.Parse(html, ctx)
-	mentionedUIDs, _ := ctx[mentionedUIDsContextKey].([]string)
+	mentionedUIDs, _ := ctx.ReturnData[mentionedUIDsContextKey].([]string)
 	return result, mentionedUIDs
 }
