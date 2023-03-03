@@ -5,6 +5,11 @@ homeserver:
     # The domain of the homeserver (for MXIDs, etc).
     domain: example.com
 
+    # Set to null to disable using the websocket. When not using the websocket, make sure hostname and port are set in the appservice section.
+    websocket_proxy:
+    # How often should the websocket be pinged? Pinging will be disabled if this is zero.
+    ping_interval_seconds: 0
+
     # What software is the homeserver running?
     # Standard Matrix homeservers like Synapse, Dendrite and Conduit should just use "standard" here.
     software: standard

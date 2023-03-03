@@ -1,8 +1,12 @@
 package internal
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"os"
 	"sync"
+	"time"
 
 	"github.com/duo/matrix-wechat/internal/config"
 	"github.com/duo/matrix-wechat/internal/database"
@@ -10,7 +14,9 @@ import (
 	"github.com/duo/matrix-wechat/internal/wechat"
 
 	"maunium.net/go/mautrix"
+	"maunium.net/go/mautrix/appservice"
 	"maunium.net/go/mautrix/bridge"
+	"maunium.net/go/mautrix/bridge/bridgeconfig"
 	"maunium.net/go/mautrix/bridge/commands"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/format"
@@ -37,6 +43,15 @@ type WechatBridge struct {
 	puppetsLock         sync.Mutex
 	checkers            map[id.UserID]chan struct{}
 	checkersLock        sync.Mutex
+
+	WebsocketHandler *WebsocketCommandHandler
+
+	stopping   bool
+	stopPinger chan struct{}
+
+	shortCircuitReconnectBackoff chan struct{}
+	websocketStarted             chan struct{}
+	websocketStopped             chan struct{}
 }
 
 func NewWechatBridge(exampleConfig string) *WechatBridge {
@@ -50,6 +65,10 @@ func NewWechatBridge(exampleConfig string) *WechatBridge {
 		puppets:             make(map[types.UID]*Puppet),
 		puppetsByCustomMXID: make(map[id.UserID]*Puppet),
 		checkers:            make(map[id.UserID]chan struct{}),
+
+		shortCircuitReconnectBackoff: make(chan struct{}),
+		websocketStarted:             make(chan struct{}),
+		websocketStopped:             make(chan struct{}),
 	}
 }
 
@@ -80,11 +99,97 @@ func (br *WechatBridge) Init() {
 		br.Config.Bridge.ListenSecret,
 		br.Log,
 	)
+
+	br.WebsocketHandler = NewWebsocketCommandHandler(br)
 }
 
 func (br *WechatBridge) Start() {
+	if br.Config.Homeserver.WSProxy != "" {
+		var startupGroup sync.WaitGroup
+		startupGroup.Add(1)
+
+		br.Log.Debugln("Starting application service websocket")
+		go br.startWebsocket(&startupGroup)
+
+		startupGroup.Wait()
+
+		br.stopPinger = make(chan struct{})
+		if br.Config.Homeserver.WSPingInterval > 0 {
+			go br.serverPinger()
+		}
+	} else {
+		if br.Config.AppService.Port == 0 {
+			br.Log.Fatalln("Both the websocket proxy and appservice listener are disabled, can't receive events")
+			os.Exit(23)
+		}
+		br.Log.Debugln("Websocket proxy not configured, not starting application service websocket")
+	}
+
 	go br.WechatService.Start()
 	go br.StartUsers()
+}
+
+type PingData struct {
+	Timestamp int64 `json:"timestamp"`
+}
+
+func (br *WechatBridge) PingServer() (start, serverTs, end time.Time) {
+	if !br.AS.HasWebsocket() {
+		br.Log.Debugln("Received server ping request, but no websocket connected. Trying to short-circuit backoff sleep")
+		select {
+		case br.shortCircuitReconnectBackoff <- struct{}{}:
+		default:
+			br.Log.Warnfln("Failed to ping websocket: not connected and no backoff?")
+			return
+		}
+		select {
+		case <-br.websocketStarted:
+		case <-time.After(15 * time.Second):
+			if !br.AS.HasWebsocket() {
+				br.Log.Warnfln("Failed to ping websocket: didn't connect after 15 seconds of waiting")
+				return
+			}
+		}
+	}
+	start = time.Now()
+	var resp PingData
+	br.Log.Debugln("Pinging appservice websocket")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	err := br.AS.RequestWebsocket(ctx, &appservice.WebsocketRequest{
+		Command: "ping",
+		Data:    &PingData{Timestamp: start.UnixMilli()},
+	}, &resp)
+	end = time.Now()
+	if err != nil {
+		br.Log.Warnfln("Websocket ping returned error in %s: %v", end.Sub(start), err)
+		br.AS.StopWebsocket(fmt.Errorf("websocket ping returned error in %s: %w", end.Sub(start), err))
+	} else {
+		serverTs = time.Unix(0, resp.Timestamp*int64(time.Millisecond))
+		br.Log.Debugfln("Websocket ping returned success in %s (request: %s, response: %s)", end.Sub(start), serverTs.Sub(start), end.Sub(serverTs))
+	}
+	return
+}
+
+func (br *WechatBridge) serverPinger() {
+	interval := time.Duration(br.Config.Homeserver.WSPingInterval) * time.Second
+	clock := time.NewTicker(interval)
+	defer func() {
+		br.Log.Infofln("Websocket pinger stopped")
+		clock.Stop()
+	}()
+	br.Log.Infofln("Pinging websocket every %s", interval)
+	for {
+		select {
+		case <-clock.C:
+			br.PingServer()
+		case <-br.stopPinger:
+			return
+		}
+		if br.stopping {
+			return
+		}
+	}
 }
 
 func (br *WechatBridge) Stop() {
@@ -108,6 +213,28 @@ func (br *WechatBridge) Stop() {
 	br.usersLock.Unlock()
 
 	br.WechatService.Stop()
+
+	br.stopping = true
+
+	if br.Config.Homeserver.WSProxy != "" {
+		select {
+		case br.stopPinger <- struct{}{}:
+		default:
+		}
+		br.Log.Debugln("Stopping transaction websocket")
+		br.AS.StopWebsocket(appservice.ErrWebsocketManualStop)
+		br.Log.Debugln("Stopping event processor")
+		// Short-circuit reconnect backoff so the websocket loop exits even if it's disconnected
+		select {
+		case br.shortCircuitReconnectBackoff <- struct{}{}:
+		default:
+		}
+		select {
+		case <-br.websocketStopped:
+		case <-time.After(4 * time.Second):
+			br.Log.Warnln("Timed out waiting for websocket to close")
+		}
+	}
 }
 
 func (br *WechatBridge) StartUsers() {
@@ -189,4 +316,117 @@ func (br *WechatBridge) createPrivatePortalFromInvite(roomID id.RoomID, inviter 
 
 func (br *WechatBridge) HandlePresence(evt *event.Event) {
 	// TODO:
+}
+
+const defaultReconnectBackoff = 2 * time.Second
+const maxReconnectBackoff = 2 * time.Minute
+const reconnectBackoffReset = 5 * time.Minute
+
+type StartSyncRequest struct {
+	AccessToken string      `json:"access_token"`
+	DeviceID    id.DeviceID `json:"device_id"`
+	UserID      id.UserID   `json:"user_id"`
+}
+
+func (br *WechatBridge) SendBridgeStatus() {
+	state := BridgeStatus{}
+
+	state.StateEvent = BridgeStatusConnected
+	state.Timestamp = time.Now().Unix()
+	state.TTL = 600
+	state.Source = "bridge"
+	//state.RemoteID = "unknown"
+
+	if err := br.AS.SendWebsocket(&appservice.WebsocketRequest{
+		Command: "bridge_status",
+		Data:    &state,
+	}); err != nil {
+		br.Log.Warnln("Error sending bridge status:", err)
+	}
+}
+
+func (br *WechatBridge) RequestStartSync() {
+	if !br.Config.Bridge.Encryption.Appservice ||
+		br.Config.Homeserver.Software == bridgeconfig.SoftwareHungry ||
+		br.Crypto == nil ||
+		!br.AS.HasWebsocket() {
+		return
+	}
+	resp := map[string]interface{}{}
+	br.Log.Debugln("Sending /sync start request through websocket")
+	cryptoClient := br.Crypto.Client()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	err := br.AS.RequestWebsocket(ctx, &appservice.WebsocketRequest{
+		Command:  "start_sync",
+		Deadline: 30 * time.Second,
+		Data: &StartSyncRequest{
+			AccessToken: cryptoClient.AccessToken,
+			DeviceID:    cryptoClient.DeviceID,
+			UserID:      cryptoClient.UserID,
+		},
+	}, &resp)
+	if err != nil {
+		go br.WebsocketHandler.HandleSyncProxyError(nil, err)
+	} else {
+		br.Log.Debugln("Started receiving encryption data with sync proxy:", resp)
+	}
+}
+
+func (br *WechatBridge) startWebsocket(wg *sync.WaitGroup) {
+	var wgOnce sync.Once
+	onConnect := func() {
+		go br.SendBridgeStatus()
+
+		br.RequestStartSync()
+
+		wgOnce.Do(wg.Done)
+
+		select {
+		case br.websocketStarted <- struct{}{}:
+		default:
+		}
+	}
+
+	reconnectBackoff := defaultReconnectBackoff
+	lastDisconnect := time.Now().UnixNano()
+	defer func() {
+		br.Log.Debugfln("Appservice websocket loop finished")
+		close(br.websocketStopped)
+	}()
+
+	for {
+		err := br.AS.StartWebsocket(br.Config.Homeserver.WSProxy, onConnect)
+		if err == appservice.ErrWebsocketManualStop {
+			return
+		} else if closeCommand := (&appservice.CloseCommand{}); errors.As(err, &closeCommand) && closeCommand.Status == appservice.MeowConnectionReplaced {
+			br.Log.Infoln("Appservice websocket closed by another instance of the bridge, shutting down...")
+			br.Stop()
+			return
+		} else if err != nil {
+			br.Log.Errorln("Error in appservice websocket:", err)
+		}
+		if br.stopping {
+			return
+		}
+		now := time.Now().UnixNano()
+		if lastDisconnect+reconnectBackoffReset.Nanoseconds() < now {
+			reconnectBackoff = defaultReconnectBackoff
+		} else {
+			reconnectBackoff *= 2
+			if reconnectBackoff > maxReconnectBackoff {
+				reconnectBackoff = maxReconnectBackoff
+			}
+		}
+		lastDisconnect = now
+		br.Log.Infofln("Websocket disconnected, reconnecting in %d seconds...", int(reconnectBackoff.Seconds()))
+		select {
+		case <-br.shortCircuitReconnectBackoff:
+			br.Log.Debugln("Reconnect backoff was short-circuited")
+		case <-time.After(reconnectBackoff):
+		}
+		if br.stopping {
+			return
+		}
+	}
 }
