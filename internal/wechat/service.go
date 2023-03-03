@@ -265,6 +265,7 @@ func (ws *WechatService) getConn(client *WechatClient) *Conn {
 	if conn, ok := ws.conns[client.getConnKey()]; ok {
 		return conn
 	} else {
+		// a better connection pick?
 		for k, v := range ws.conns {
 			client.setConnKey(k)
 			return v

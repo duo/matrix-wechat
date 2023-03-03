@@ -71,6 +71,8 @@ appservice:
 
 # Bridge config
 bridge:
+    # Proxy for homeserver connection.
+    hs_proxy:
     # Localpart template of MXIDs for WeChat users.
     username_template: _wechat_{{.}}
     # Displayname template for WeChat users.

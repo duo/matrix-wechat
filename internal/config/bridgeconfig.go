@@ -18,6 +18,8 @@ const (
 )
 
 type BridgeConfig struct {
+	HomeserverProxy string `yaml:"hs_proxy"`
+
 	UsernameTemplate    string `yaml:"username_template"`
 	DisplaynameTemplate string `yaml:"displayname_template"`
 	ListenAddress       string `yaml:"listen_address"`
