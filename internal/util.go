@@ -172,7 +172,7 @@ func silk2ogg(rawData []byte) ([]byte, error) {
 	defer os.Remove(wavFile.Name())
 	{
 		cmd := exec.Command(
-			"ffmpeg", "-f", "s16le", "-ar", "24000", "-ac", "1", "-vol", "2000", "-y", "-i", pcmFile.Name(), "-f", "wav", wavFile.Name())
+			"ffmpeg", "-f", "s16le", "-ar", "24000", "-ac", "1", "-y", "-i", pcmFile.Name(), "-f", "wav", "-af", "volume=7.812500", wavFile.Name())
 		if err := cmd.Start(); err != nil {
 			return nil, err
 		}
