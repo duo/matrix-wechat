@@ -17,10 +17,11 @@ type User struct {
 	db  *Database
 	log log.Logger
 
-	MXID           id.UserID
-	UID            types.UID
-	ManagementRoom id.RoomID
-	SpaceRoom      id.RoomID
+	MXID                     id.UserID
+	UID                      types.UID
+	ManagementRoom           id.RoomID
+	SpaceRoom                id.RoomID
+	OfficialAccountSpaceRoom id.RoomID
 
 	lastReadCache     map[PortalKey]time.Time
 	lastReadCacheLock sync.Mutex
@@ -30,7 +31,7 @@ type User struct {
 
 func (u *User) Scan(row dbutil.Scannable) *User {
 	var uin sql.NullString
-	err := row.Scan(&u.MXID, &uin, &u.ManagementRoom, &u.SpaceRoom)
+	err := row.Scan(&u.MXID, &uin, &u.ManagementRoom, &u.SpaceRoom, &u.OfficialAccountSpaceRoom)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			u.log.Errorln("Database scan failed:", err)
@@ -47,11 +48,11 @@ func (u *User) Scan(row dbutil.Scannable) *User {
 
 func (u *User) Insert() {
 	query := `
-		INSERT INTO "user" (mxid, uin, management_room, space_room)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO "user" (mxid, uin, management_room, space_room, official_account_space_room)
+		VALUES ($1, $2, $3, $4, $5)
 	`
 	args := []interface{}{
-		u.MXID, u.UID.Uin, u.ManagementRoom, u.SpaceRoom,
+		u.MXID, u.UID.Uin, u.ManagementRoom, u.SpaceRoom, u.OfficialAccountSpaceRoom,
 	}
 
 	_, err := u.db.Exec(query, args...)
@@ -63,11 +64,11 @@ func (u *User) Insert() {
 func (u *User) Update() {
 	query := `
 		UPDATE "user"
-		SET uin=$1, management_room=$2, space_room=$3
-		WHERE mxid=$4
+		SET uin=$1, management_room=$2, space_room=$3, official_account_space_room=$4
+		WHERE mxid=$5
 	`
 	args := []interface{}{
-		u.UID.Uin, u.ManagementRoom, u.SpaceRoom, u.MXID,
+		u.UID.Uin, u.ManagementRoom, u.SpaceRoom, u.OfficialAccountSpaceRoom, u.MXID,
 	}
 	_, err := u.db.Exec(query, args...)
 	if err != nil {

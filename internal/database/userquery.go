@@ -9,7 +9,7 @@ import (
 	log "maunium.net/go/maulogger/v2"
 )
 
-const userColumns = "mxid, uin, management_room, space_room"
+const userColumns = "mxid, uin, management_room, space_room, official_account_space_room"
 
 type UserQuery struct {
 	db  *Database
