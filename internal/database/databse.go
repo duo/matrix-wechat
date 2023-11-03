@@ -8,7 +8,7 @@ import (
 
 	"github.com/duo/matrix-wechat/internal/database/upgrades"
 
-	"maunium.net/go/mautrix/util/dbutil"
+	"go.mau.fi/util/dbutil"
 
 	"github.com/rs/zerolog"
 )

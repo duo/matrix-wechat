@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"maunium.net/go/mautrix/id"
-	"maunium.net/go/mautrix/util/dbutil"
+	"go.mau.fi/util/dbutil"
 
 	"github.com/rs/zerolog"
 )

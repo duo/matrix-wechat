@@ -7,7 +7,7 @@ import (
 	"github.com/duo/matrix-wechat/internal/config"
 
 	"maunium.net/go/mautrix/bridge"
-	"maunium.net/go/mautrix/util/configupgrade"
+	"go.mau.fi/util/configupgrade"
 )
 
 // Information to find out exactly which commit the bridge was built from.

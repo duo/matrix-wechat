@@ -27,8 +27,8 @@ import (
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/format"
 	"maunium.net/go/mautrix/id"
-	"maunium.net/go/mautrix/util"
-	"maunium.net/go/mautrix/util/dbutil"
+	"go.mau.fi/util/dbutil"
+	"go.mau.fi/util/exerrors"
 
 	_ "image/gif"
 	_ "image/jpeg"
@@ -1323,12 +1323,12 @@ func (p *Portal) preprocessMatrixMedia(content *event.MessageEventContent) (stri
 	}
 	data, err := p.MainIntent().DownloadBytesContext(context.Background(), mxc)
 	if err != nil {
-		return fileName, nil, util.NewDualError(errMediaDownloadFailed, err)
+		return fileName, nil, exerrors.NewDualError(errMediaDownloadFailed, err)
 	}
 	if file != nil {
 		err = file.DecryptInPlace(data)
 		if err != nil {
-			return fileName, nil, util.NewDualError(errMediaDecryptFailed, err)
+			return fileName, nil, exerrors.NewDualError(errMediaDecryptFailed, err)
 		}
 	}
 
