@@ -3,11 +3,11 @@ package internal
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"image"
-	"crypto/rand"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -19,6 +19,8 @@ import (
 	"github.com/duo/matrix-wechat/internal/wechat"
 
 	"github.com/gabriel-vasile/mimetype"
+	"go.mau.fi/util/dbutil"
+	"go.mau.fi/util/exerrors"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/appservice"
 	"maunium.net/go/mautrix/bridge"
@@ -27,8 +29,6 @@ import (
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/format"
 	"maunium.net/go/mautrix/id"
-	"go.mau.fi/util/dbutil"
-	"go.mau.fi/util/exerrors"
 
 	_ "image/gif"
 	_ "image/jpeg"

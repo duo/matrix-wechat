@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"time"
 
-	"maunium.net/go/mautrix/id"
 	"go.mau.fi/util/dbutil"
+	"maunium.net/go/mautrix/id"
 
 	"github.com/rs/zerolog"
 )
