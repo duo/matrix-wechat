@@ -1276,7 +1276,7 @@ func (p *Portal) uploadMedia(intent *appservice.IntentAPI, data []byte, content 
 	}
 	var mxc id.ContentURI
 	if p.bridge.Config.Homeserver.AsyncMedia {
-		uploaded, err := intent.UnstableUploadAsync(req)
+		uploaded, err := intent.UploadAsync(req)
 		if err != nil {
 			return err
 		}
