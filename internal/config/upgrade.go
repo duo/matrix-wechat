@@ -20,7 +20,6 @@ func DoUpgrade(helper *up.Helper) {
 	helper.Copy(up.Int, "bridge", "portal_message_buffer")
 	helper.Copy(up.Bool, "bridge", "allow_redaction")
 	helper.Copy(up.Bool, "bridge", "user_avatar_sync")
-	helper.Copy(up.Bool, "bridge", "sync_with_custom_puppets")
 	helper.Copy(up.Bool, "bridge", "sync_direct_chat_list")
 	helper.Copy(up.Bool, "bridge", "default_bridge_presence")
 	helper.Copy(up.Bool, "bridge", "send_presence_on_typing")

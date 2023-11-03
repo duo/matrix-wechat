@@ -377,30 +377,6 @@ func (u *User) IsLoggedIn() bool {
 	return u.Client != nil && u.Client.IsLoggedIn()
 }
 
-func (u *User) tryAutomaticDoublePuppeting() {
-	if !u.bridge.Config.CanAutoDoublePuppet(u.MXID) {
-		return
-	}
-	u.log.Debug().Msgf("Checking if double puppeting needs to be enabled")
-	puppet := u.bridge.GetPuppetByUID(u.UID)
-	if len(puppet.CustomMXID) > 0 {
-		u.log.Debug().Msgf("User already has double-puppeting enabled")
-		// Custom puppet already enabled
-		return
-	}
-	accessToken, err := puppet.loginWithSharedSecret(u.MXID)
-	if err != nil {
-		u.log.Warn().Msgf("Failed to login with shared secret: %s", err)
-		return
-	}
-	err = puppet.SwitchCustomMXID(accessToken, u.MXID)
-	if err != nil {
-		puppet.log.Warn().Msgf("Failed to switch to auto-logined custom puppet: %s", err)
-		return
-	}
-	u.log.Info().Msgf("Successfully automatically enabled custom puppet")
-}
-
 func (u *User) getDirectChats() map[id.UserID][]id.RoomID {
 	res := make(map[id.UserID][]id.RoomID)
 	privateChats := u.bridge.DB.Portal.FindPrivateChats(u.UID)

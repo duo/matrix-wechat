@@ -160,12 +160,7 @@ func fnLogout(ce *WrappedCommandEvent) {
 		return
 	}
 	puppet := ce.Bridge.GetPuppetByUID(ce.User.UID)
-	if puppet.CustomMXID != "" {
-		err := puppet.SwitchCustomMXID("", "")
-		if err != nil {
-			ce.User.log.Warn().Msgf("Failed to logout-matrix while logging out of WeChat: %s", err)
-		}
-	}
+	puppet.ClearCustomMXID()
 	ce.User.removeFromUIDMap(status.BridgeState{StateEvent: status.StateLoggedOut})
 	ce.User.DeleteConnection()
 	ce.User.DeleteSession()
