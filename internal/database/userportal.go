@@ -26,7 +26,7 @@ func (u *User) GetLastReadTS(portal PortalKey) time.Time {
 	var ts int64
 	err := u.db.QueryRow(query, args...).Scan(&ts)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		u.log.Warnfln("Failed to scan last read timestamp from user portal table: %v", err)
+		u.log.Warn().Msgf("Failed to scan last read timestamp from user portal table: %v", err)
 	}
 	if ts == 0 {
 		u.lastReadCache[portal] = time.Time{}
@@ -56,9 +56,9 @@ func (u *User) SetLastReadTS(portal PortalKey, ts time.Time) {
 
 	_, err := u.db.Exec(query, args...)
 	if err != nil {
-		u.log.Warnfln("Failed to update last read timestamp: %v", err)
+		u.log.Warn().Msgf("Failed to update last read timestamp: %v", err)
 	} else {
-		u.log.Debugfln("Set last read timestamp of %s in %s to %d", u.MXID, portal, ts.Unix())
+		u.log.Debug().Msgf("Set last read timestamp of %s in %s to %d", u.MXID, portal, ts.Unix())
 		u.lastReadCache[portal] = ts
 	}
 }
@@ -83,7 +83,7 @@ func (u *User) IsInSpace(portal PortalKey) bool {
 	var inSpace bool
 	err := u.db.QueryRow(query, args...).Scan(&inSpace)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		u.log.Warnfln("Failed to scan in space status from user portal table: %v", err)
+		u.log.Warn().Msgf("Failed to scan in space status from user portal table: %v", err)
 	}
 	u.inSpaceCache[portal] = inSpace
 
@@ -108,7 +108,7 @@ func (u *User) MarkInSpace(portal PortalKey) {
 
 	_, err := u.db.Exec(query, args...)
 	if err != nil {
-		u.log.Warnfln("Failed to update in space status: %v", err)
+		u.log.Warn().Msgf("Failed to update in space status: %v", err)
 	} else {
 		u.inSpaceCache[portal] = true
 	}

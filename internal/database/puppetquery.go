@@ -7,7 +7,7 @@ import (
 
 	"maunium.net/go/mautrix/id"
 
-	log "maunium.net/go/maulogger/v2"
+	"github.com/rs/zerolog"
 )
 
 const puppetColumns = `
@@ -17,7 +17,7 @@ const puppetColumns = `
 
 type PuppetQuery struct {
 	db  *Database
-	log log.Logger
+	log zerolog.Logger
 }
 
 func (pq *PuppetQuery) New() *Puppet {

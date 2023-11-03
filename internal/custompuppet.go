@@ -12,6 +12,8 @@ import (
 	"maunium.net/go/mautrix/appservice"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
+
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -48,7 +50,7 @@ func (p *Puppet) SwitchCustomMXID(accessToken string, mxid id.UserID) error {
 
 func (p *Puppet) loginWithSharedSecret(mxid id.UserID) (string, error) {
 	_, homeserver, _ := mxid.Parse()
-	p.log.Debugfln("Logging into %s with shared secret", mxid)
+	p.log.Debug().Msgf("Logging into %s with shared secret", mxid)
 	loginSecret := p.bridge.Config.Bridge.LoginSharedSecretMap[homeserver]
 	client, err := p.bridge.newDoublePuppetClient(mxid, "")
 	if err != nil {
@@ -84,14 +86,14 @@ func (br *WechatBridge) newDoublePuppetClient(mxid id.UserID, accessToken string
 	homeserverURL, found := br.Config.Bridge.DoublePuppetServerMap[homeserver]
 	if !found {
 		if homeserver == br.AS.HomeserverDomain {
-			homeserverURL = br.AS.HomeserverURL
+			homeserverURL = br.Config.Homeserver.Address
 		} else if br.Config.Bridge.DoublePuppetAllowDiscovery {
 			resp, err := mautrix.DiscoverClientAPI(homeserver)
 			if err != nil {
 				return nil, fmt.Errorf("failed to find homeserver URL for %s: %v", homeserver, err)
 			}
 			homeserverURL = resp.Homeserver.BaseURL
-			br.Log.Debugfln("Discovered URL %s for %s to enable double puppeting for %s", homeserverURL, homeserver, mxid)
+			log.Debug().Msgf("Discovered URL %s for %s to enable double puppeting for %s", homeserverURL, homeserver, mxid)
 		} else {
 			return nil, fmt.Errorf("double puppeting from %s is not allowed", homeserver)
 		}
@@ -100,7 +102,7 @@ func (br *WechatBridge) newDoublePuppetClient(mxid id.UserID, accessToken string
 	if err != nil {
 		return nil, err
 	}
-	client.Logger = br.AS.Log.Sub(mxid.String())
+	client.Log = br.AS.Log.With().Str("mxid", mxid.String()).Logger()
 	client.Client = br.AS.HTTPClient
 	client.DefaultHTTPRetries = br.AS.DefaultHTTPRetries
 
@@ -166,11 +168,11 @@ func (p *Puppet) startSyncing() {
 		return
 	}
 	go func() {
-		p.log.Debugln("Starting syncing...")
+		p.log.Debug().Msgf("Starting syncing...")
 		p.customIntent.SyncPresence = "offline"
 		err := p.customIntent.Sync()
 		if err != nil {
-			p.log.Errorln("Fatal error syncing:", err)
+			p.log.Error().Msgf("Fatal error syncing: %s", err)
 		}
 	}()
 }
@@ -184,7 +186,7 @@ func (p *Puppet) stopSyncing() {
 
 func (p *Puppet) ProcessResponse(resp *mautrix.RespSync, _ string) error {
 	if !p.customUser.IsLoggedIn() {
-		p.log.Debugln("Skipping sync processing: custom user not connected to wechat")
+		p.log.Debug().Msgf("Skipping sync processing: custom user not connected to wechat")
 		return nil
 	}
 	for roomID, events := range resp.Rooms.Join {
@@ -219,19 +221,19 @@ func (p *Puppet) tryRelogin(cause error, action string) bool {
 	if !p.bridge.Config.CanAutoDoublePuppet(p.CustomMXID) {
 		return false
 	}
-	p.log.Debugfln("Trying to relogin after '%v' while %s", cause, action)
+	p.log.Debug().Msgf("Trying to relogin after '%v' while %s", cause, action)
 	accessToken, err := p.loginWithSharedSecret(p.CustomMXID)
 	if err != nil {
-		p.log.Errorfln("Failed to relogin after '%v' while %s: %v", cause, action, err)
+		p.log.Error().Msgf("Failed to relogin after '%v' while %s: %v", cause, action, err)
 		return false
 	}
-	p.log.Infofln("Successfully relogined after '%v' while %s", cause, action)
+	p.log.Info().Msgf("Successfully relogined after '%v' while %s", cause, action)
 	p.AccessToken = accessToken
 	return true
 }
 
 func (p *Puppet) OnFailedSync(_ *mautrix.RespSync, err error) (time.Duration, error) {
-	p.log.Warnln("Sync error:", err)
+	p.log.Warn().Msgf("Sync error: %s", err)
 	if errors.Is(err, mautrix.MUnknownToken) {
 		if !p.tryRelogin(err, "syncing") {
 			return 0, err

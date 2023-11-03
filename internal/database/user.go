@@ -10,12 +10,12 @@ import (
 	"maunium.net/go/mautrix/id"
 	"maunium.net/go/mautrix/util/dbutil"
 
-	log "maunium.net/go/maulogger/v2"
+	"github.com/rs/zerolog"
 )
 
 type User struct {
 	db  *Database
-	log log.Logger
+	log zerolog.Logger
 
 	MXID           id.UserID
 	UID            types.UID
@@ -33,7 +33,7 @@ func (u *User) Scan(row dbutil.Scannable) *User {
 	err := row.Scan(&u.MXID, &uin, &u.ManagementRoom, &u.SpaceRoom)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			u.log.Errorln("Database scan failed:", err)
+			u.log.Error().Msgf("Database scan failed: %s", err)
 		}
 
 		return nil
@@ -56,7 +56,7 @@ func (u *User) Insert() {
 
 	_, err := u.db.Exec(query, args...)
 	if err != nil {
-		u.log.Warnfln("Failed to insert %s: %v", u.MXID, err)
+		u.log.Warn().Msgf("Failed to insert %s: %v", u.MXID, err)
 	}
 }
 
@@ -71,6 +71,6 @@ func (u *User) Update() {
 	}
 	_, err := u.db.Exec(query, args...)
 	if err != nil {
-		u.log.Warnfln("Failed to update %s: %v", u.MXID, err)
+		u.log.Warn().Msgf("Failed to update %s: %v", u.MXID, err)
 	}
 }

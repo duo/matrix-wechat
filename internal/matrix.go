@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"maunium.net/go/maulogger/v2"
+	"github.com/rs/zerolog"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/appservice"
 	"maunium.net/go/mautrix/id"
@@ -18,7 +18,7 @@ const BridgeStatusConnected = "CONNECTED"
 
 type WebsocketCommandHandler struct {
 	bridge      *WechatBridge
-	log         maulogger.Logger
+	log         zerolog.Logger
 	errorTxnIDC *appservice.TransactionIDCache
 
 	lastSyncProxyError time.Time
@@ -43,7 +43,7 @@ type BridgeStatus struct {
 func NewWebsocketCommandHandler(br *WechatBridge) *WebsocketCommandHandler {
 	handler := &WebsocketCommandHandler{
 		bridge:           br,
-		log:              br.Log.Sub("MatrixWebsocket"),
+		log:              br.ZLog.With().Str("handler", "MatrixWebsocket").Logger(),
 		errorTxnIDC:      appservice.NewTransactionIDCache(8),
 		syncProxyBackoff: DefaultSyncProxyBackoff,
 	}
@@ -54,7 +54,7 @@ func NewWebsocketCommandHandler(br *WechatBridge) *WebsocketCommandHandler {
 }
 
 func (mx *WebsocketCommandHandler) handleWSPing(cmd appservice.WebsocketCommand) (bool, interface{}) {
-	mx.log.Warnfln("Receive ws ping")
+	mx.log.Warn().Msgf("Receive ws ping")
 	status := BridgeStatus{
 		StateEvent: BridgeStatusConnected,
 		Timestamp:  time.Now().Unix(),
@@ -70,11 +70,11 @@ func (mx *WebsocketCommandHandler) handleWSSyncProxyError(cmd appservice.Websock
 	err := json.Unmarshal(cmd.Data, &data)
 
 	if err != nil {
-		mx.log.Warnln("Failed to unmarshal syncproxy_error data:", err)
+		mx.log.Warn().Msgf("Failed to unmarshal syncproxy_error data: %s", err)
 	} else if txnID, ok := data.ExtraData["txn_id"].(string); !ok {
-		mx.log.Warnln("Got syncproxy_error data with no transaction ID")
+		mx.log.Warn().Msgf("Got syncproxy_error data with no transaction ID")
 	} else if mx.errorTxnIDC.IsProcessed(txnID) {
-		mx.log.Debugln("Ignoring syncproxy_error with duplicate transaction ID", txnID)
+		mx.log.Debug().Msgf("Ignoring syncproxy_error with duplicate transaction ID %s", txnID)
 	} else {
 		go mx.HandleSyncProxyError(&data, nil)
 		mx.errorTxnIDC.MarkProcessed(txnID)
@@ -89,7 +89,7 @@ func (mx *WebsocketCommandHandler) HandleSyncProxyError(syncErr *mautrix.RespErr
 		if err == nil {
 			err = syncErr.Err
 		}
-		mx.log.Debugfln("Got sync proxy error (%v), but there's already another thread waiting to restart sync proxy", err)
+		mx.log.Debug().Msgf("Got sync proxy error (%v), but there's already another thread waiting to restart sync proxy", err)
 		return
 	}
 	if time.Since(mx.lastSyncProxyError) < MaxSyncProxyBackoff {
@@ -102,9 +102,9 @@ func (mx *WebsocketCommandHandler) HandleSyncProxyError(syncErr *mautrix.RespErr
 	}
 	mx.lastSyncProxyError = time.Now()
 	if syncErr != nil {
-		mx.log.Errorfln("Syncproxy told us that syncing failed: %s - Requesting a restart in %s", syncErr.Err, mx.syncProxyBackoff)
+		mx.log.Error().Msgf("Syncproxy told us that syncing failed: %s - Requesting a restart in %s", syncErr.Err, mx.syncProxyBackoff)
 	} else if startErr != nil {
-		mx.log.Errorfln("Failed to request sync proxy to start syncing: %v - Requesting a restart in %s", startErr, mx.syncProxyBackoff)
+		mx.log.Error().Msgf("Failed to request sync proxy to start syncing: %v - Requesting a restart in %s", startErr, mx.syncProxyBackoff)
 	}
 	time.Sleep(mx.syncProxyBackoff)
 	atomic.StoreInt64(&mx.syncProxyWaiting, 0)

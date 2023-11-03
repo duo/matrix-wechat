@@ -79,7 +79,7 @@ func fnLogin(ce *WrappedCommandEvent) {
 
 	err := ce.User.Connect()
 	if err != nil {
-		ce.User.log.Errorf("Failed to connect:", err)
+		ce.User.log.Error().Msgf("Failed to connect: %s", err)
 		ce.Reply("Failed to connect: %v", err)
 		return
 	}
@@ -128,7 +128,7 @@ func (u *User) sendQR(ce *WrappedCommandEvent, qrCode []byte) (id.EventID, error
 	}
 	resp, err := ce.Bot.SendMessageEvent(ce.RoomID, event.EventMessage, &content)
 	if err != nil {
-		u.log.Errorln("Failed to send edited QR code to user:", err)
+		u.log.Error().Msgf("Failed to send edited QR code to user: %s", err)
 	}
 	return resp.EventID, nil
 }
@@ -138,7 +138,7 @@ func (u *User) uploadQR(ce *WrappedCommandEvent, qrCode []byte) (id.ContentURI, 
 
 	resp, err := bot.UploadBytes(qrCode, "image/png")
 	if err != nil {
-		u.log.Errorln("Failed to upload QR code:", err)
+		u.log.Error().Msgf("Failed to upload QR code: %s", err)
 		ce.Reply("Failed to upload QR code: %v", err)
 		return id.ContentURI{}, err
 	}
@@ -163,7 +163,7 @@ func fnLogout(ce *WrappedCommandEvent) {
 	if puppet.CustomMXID != "" {
 		err := puppet.SwitchCustomMXID("", "")
 		if err != nil {
-			ce.User.log.Warnln("Failed to logout-matrix while logging out of WeChat:", err)
+			ce.User.log.Warn().Msgf("Failed to logout-matrix while logging out of WeChat: %s", err)
 		}
 	}
 	ce.User.removeFromUIDMap(status.BridgeState{StateEvent: status.StateLoggedOut})
@@ -196,7 +196,7 @@ func canDeletePortal(portal *Portal, userID id.UserID) bool {
 
 	members, err := portal.MainIntent().JoinedMembers(portal.MXID)
 	if err != nil {
-		portal.log.Errorfln("Failed to get joined members to check if portal can be deleted by %s: %v", userID, err)
+		portal.log.Error().Msgf("Failed to get joined members to check if portal can be deleted by %s: %v", userID, err)
 		return false
 	}
 	for otherUser := range members.Joined {
@@ -228,7 +228,7 @@ func fnDeletePortal(ce *WrappedCommandEvent) {
 		return
 	}
 
-	ce.Portal.log.Infoln(ce.User.MXID, "requested deletion of portal.")
+	ce.Portal.log.Info().Str("mxid", ce.User.MXID.String()).Msgf("requested deletion of portal.")
 	ce.Portal.Delete()
 	ce.Portal.Cleanup(false)
 }

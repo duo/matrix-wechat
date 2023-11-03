@@ -3,12 +3,12 @@ package database
 import (
 	"maunium.net/go/mautrix/id"
 
-	log "maunium.net/go/maulogger/v2"
+	"github.com/rs/zerolog"
 )
 
 type MessageQuery struct {
 	db  *Database
-	log log.Logger
+	log zerolog.Logger
 }
 
 func (mq *MessageQuery) New() *Message {

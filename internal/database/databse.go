@@ -8,8 +8,9 @@ import (
 
 	"github.com/duo/matrix-wechat/internal/database/upgrades"
 
-	"maunium.net/go/maulogger/v2"
 	"maunium.net/go/mautrix/util/dbutil"
+
+	"github.com/rs/zerolog"
 )
 
 type Database struct {
@@ -21,24 +22,24 @@ type Database struct {
 	Message *MessageQuery
 }
 
-func New(baseDB *dbutil.Database, log maulogger.Logger) *Database {
+func New(baseDB *dbutil.Database, log zerolog.Logger) *Database {
 	db := &Database{Database: baseDB}
 	db.UpgradeTable = upgrades.Table
 	db.User = &UserQuery{
 		db:  db,
-		log: log.Sub("User"),
+		log: log.With().Str("query", "User").Logger(),
 	}
 	db.Puppet = &PuppetQuery{
 		db:  db,
-		log: log.Sub("Puppet"),
+		log: log.With().Str("query", "Puppet").Logger(),
 	}
 	db.Portal = &PortalQuery{
 		db:  db,
-		log: log.Sub("Portal"),
+		log: log.With().Str("query", "Portal").Logger(),
 	}
 	db.Message = &MessageQuery{
 		db:  db,
-		log: log.Sub("Message"),
+		log: log.With().Str("query", "Message").Logger(),
 	}
 	return db
 }

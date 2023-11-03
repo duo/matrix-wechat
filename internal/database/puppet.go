@@ -9,12 +9,12 @@ import (
 	"maunium.net/go/mautrix/id"
 	"maunium.net/go/mautrix/util/dbutil"
 
-	log "maunium.net/go/maulogger/v2"
+	"github.com/rs/zerolog"
 )
 
 type Puppet struct {
 	db          *Database
-	log         log.Logger
+	log         zerolog.Logger
 	UID         types.UID
 	Avatar      string
 	AvatarURL   id.ContentURI
@@ -41,7 +41,7 @@ func (p *Puppet) Scan(row dbutil.Scannable) *Puppet {
 	)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			p.log.Errorln("Database scan failed:", err)
+			p.log.Error().Msgf("Database scan failed: %s", err)
 		}
 
 		return nil
@@ -82,7 +82,7 @@ func (p *Puppet) Insert() {
 
 	_, err := p.db.Exec(query, args...)
 	if err != nil {
-		p.log.Warnfln("Failed to insert %s: %v", p.UID, err)
+		p.log.Warn().Msgf("Failed to insert %s: %v", p.UID, err)
 	}
 }
 
@@ -105,6 +105,6 @@ func (p *Puppet) Update() {
 
 	_, err := p.db.Exec(query, args...)
 	if err != nil {
-		p.log.Warnfln("Failed to update %s: %v", p.UID, err)
+		p.log.Warn().Msgf("Failed to update %s: %v", p.UID, err)
 	}
 }

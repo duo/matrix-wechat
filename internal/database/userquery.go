@@ -6,14 +6,14 @@ import (
 
 	"maunium.net/go/mautrix/id"
 
-	log "maunium.net/go/maulogger/v2"
+	"github.com/rs/zerolog"
 )
 
 const userColumns = "mxid, uin, management_room, space_room"
 
 type UserQuery struct {
 	db  *Database
-	log log.Logger
+	log zerolog.Logger
 }
 
 func (uq *UserQuery) New() *User {

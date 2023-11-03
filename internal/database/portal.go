@@ -7,12 +7,12 @@ import (
 	"maunium.net/go/mautrix/id"
 	"maunium.net/go/mautrix/util/dbutil"
 
-	log "maunium.net/go/maulogger/v2"
+	"github.com/rs/zerolog"
 )
 
 type Portal struct {
 	db  *Database
-	log log.Logger
+	log zerolog.Logger
 
 	Key  PortalKey
 	MXID id.RoomID
@@ -41,7 +41,7 @@ func (p *Portal) Scan(row dbutil.Scannable) *Portal {
 	)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			p.log.Errorln("Database scan failed:", err)
+			p.log.Error().Msgf("Database scan failed: %s", err)
 		}
 
 		return nil
@@ -71,7 +71,7 @@ func (p *Portal) Insert() {
 
 	_, err := p.db.Exec(query, args...)
 	if err != nil {
-		p.log.Warnfln("Failed to insert %s: %v", p.Key, err)
+		p.log.Warn().Msgf("Failed to insert %s: %v", p.Key, err)
 	}
 }
 
@@ -94,7 +94,7 @@ func (p *Portal) Update(txn dbutil.Transaction) {
 		_, err = p.db.Exec(query, args...)
 	}
 	if err != nil {
-		p.log.Warnfln("Failed to update %s: %v", p.Key, err)
+		p.log.Warn().Msgf("Failed to update %s: %v", p.Key, err)
 	}
 }
 
@@ -109,7 +109,7 @@ func (p *Portal) Delete() {
 
 	_, err := p.db.Exec(query, args...)
 	if err != nil {
-		p.log.Warnfln("Failed to delete %s: %v", p.Key, err)
+		p.log.Warn().Msgf("Failed to delete %s: %v", p.Key, err)
 	}
 }
 

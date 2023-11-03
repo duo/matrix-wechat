@@ -11,7 +11,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	log "maunium.net/go/maulogger/v2"
+	"github.com/rs/zerolog"
 )
 
 var (
@@ -56,7 +56,7 @@ func (c *Conn) close() {
 }
 
 type WechatService struct {
-	log log.Logger
+	log zerolog.Logger
 
 	addr   string
 	secret string
@@ -74,9 +74,9 @@ type WechatService struct {
 	requestID    int64
 }
 
-func NewWechatService(addr, secret string, log log.Logger) *WechatService {
+func NewWechatService(addr, secret string, log zerolog.Logger) *WechatService {
 	service := &WechatService{
-		log:      log.Sub("WeChat"),
+		log:      log.With().Str("service", "WeChat").Logger(),
 		addr:     addr,
 		secret:   secret,
 		clients:  make(map[string]*WechatClient),
@@ -105,16 +105,16 @@ func (ws *WechatService) NewClient(mxid string) *WechatClient {
 }
 
 func (ws *WechatService) Start() {
-	ws.log.Infoln("WechatService starting to listen on", ws.addr)
+	ws.log.Info().Msgf("WechatService starting to listen on %s", ws.addr)
 
 	err := ws.server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
-		ws.log.Fatalln("Error in listener:", err)
+		ws.log.Fatal().Msgf("Error in listener: %s", err)
 	}
 }
 
 func (ws *WechatService) Stop() {
-	ws.log.Infofln("WechatService stopping")
+	ws.log.Info().Msgf("WechatService stopping")
 
 	ws.connLock.Lock()
 	defer ws.connLock.Unlock()
@@ -126,7 +126,7 @@ func (ws *WechatService) Stop() {
 	defer cancel()
 	err := ws.server.Shutdown(ctx)
 	if err != nil {
-		ws.log.Warnln("Failed to close server:", err)
+		ws.log.Warn().Msgf("Failed to close server: %s", err)
 	}
 }
 
@@ -144,15 +144,15 @@ func (ws *WechatService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		ws.log.Warnln("Failed to upgrade websocket request:", err)
+		ws.log.Warn().Msgf("Failed to upgrade websocket request: %s", err)
 		return
 	}
 
 	key := conn.RemoteAddr().String()
 
-	ws.log.Infoln("Agent connected from:", key)
+	ws.log.Info().Msgf("Agent connected from: %s", key)
 	defer func() {
-		ws.log.Infoln("Agent disconnected from:", key)
+		ws.log.Info().Msgf("Agent disconnected from: %s", key)
 		ws.connLock.Lock()
 		delete(ws.conns, key)
 		ws.connLock.Unlock()
@@ -167,7 +167,7 @@ func (ws *WechatService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var msg Message
 		err := conn.ReadJSON(&msg)
 		if err != nil {
-			ws.log.Warnln("Error reading from websocket:", err)
+			ws.log.Warn().Msgf("Error reading from websocket: %s", err)
 			break
 		}
 
@@ -181,10 +181,10 @@ func (ws *WechatService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				if ok {
 					go client.processFunc(request.Data.(*Event))
 				} else {
-					ws.log.Warnln("Dropping event for %d: no receiver", msg.MXID)
+					ws.log.Warn().Msgf("Dropping event for %s: no receiver", msg.MXID)
 				}
 			} else {
-				ws.log.Warnfln("Request %s not support", request.Type)
+				ws.log.Warn().Msgf("Request %s not support", request.Type)
 			}
 		case MsgResponse:
 			ws.requestsLock.RLock()
@@ -194,10 +194,10 @@ func (ws *WechatService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				select {
 				case respChan <- msg.Data.(*Response):
 				default:
-					ws.log.Warnfln("Failed to handle response to %d: channel didn't accept response", msg.ID)
+					ws.log.Warn().Msgf("Failed to handle response to %d: channel didn't accept response", msg.ID)
 				}
 			} else {
-				ws.log.Warnfln("Dropping response to %d: unknown request ID", msg.ID)
+				ws.log.Warn().Msgf("Dropping response to %d: unknown request ID", msg.ID)
 			}
 		}
 	}
@@ -223,14 +223,14 @@ func (ws *WechatService) request(client *WechatClient, req *Request) (any, error
 		return nil, errors.New("no agent connection avaiable")
 	}
 
-	ws.log.Debugfln("Send request message #%d %s", msg.ID, req.Type)
+	ws.log.Debug().Msgf("Send request message #%d %s", msg.ID, req.Type)
 	if err := conn.sendMessage(msg); err != nil {
 		return nil, err
 	}
 
 	select {
 	case resp := <-respChan:
-		ws.log.Debugfln("Receive response message #%d %s", msg.ID, resp.Type)
+		ws.log.Debug().Msgf("Receive response message #%d %s", msg.ID, resp.Type)
 		//return resp.Data, resp.Error
 		if resp.Error != nil {
 			return nil, resp.Error
