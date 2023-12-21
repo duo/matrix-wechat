@@ -6,8 +6,8 @@ import (
 	"github.com/duo/matrix-wechat/internal"
 	"github.com/duo/matrix-wechat/internal/config"
 
+	"go.mau.fi/util/configupgrade"
 	"maunium.net/go/mautrix/bridge"
-	"maunium.net/go/mautrix/util/configupgrade"
 )
 
 // Information to find out exactly which commit the bridge was built from.
@@ -27,7 +27,7 @@ func main() {
 		Name:         "matrix-wechat",
 		URL:          "https://github.com/duo/matrix-wechat",
 		Description:  "A Matrix-WeChat puppeting bridge.",
-		Version:      "0.2.1",
+		Version:      "0.2.3",
 		ProtocolName: "Wechat",
 
 		CryptoPickleKey: "github.com/duo/matrix-wechat",

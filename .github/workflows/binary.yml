@@ -20,7 +20,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: "1.20.1"
+          go-version: "1.21.5"
 
       - name: Build olm
         run: |
@@ -53,8 +53,8 @@ jobs:
             apt-get update -q
             apt-get install -q -y wget build-essential libolm-dev gcc git cmake
             rm -rf /usr/local/go
-            wget -q https://go.dev/dl/go1.20.1.linux-arm64.tar.gz
-            tar -C /usr/local -xzf go1.20.1.linux-arm64.tar.gz
+            wget -q https://go.dev/dl/go1.21.5.linux-arm64.tar.gz
+            tar -C /usr/local -xzf go1.21.5.linux-arm64.tar.gz
             cd /tmp
             git clone https://gitlab.matrix.org/matrix-org/olm.git
             cd olm

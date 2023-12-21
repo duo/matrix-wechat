@@ -8,10 +8,9 @@ import (
 
 	"github.com/duo/matrix-wechat/internal/types"
 
+	"github.com/rs/zerolog"
+	"go.mau.fi/util/dbutil"
 	"maunium.net/go/mautrix/id"
-	"maunium.net/go/mautrix/util/dbutil"
-
-	log "maunium.net/go/maulogger/v2"
 )
 
 type MessageErrorType string
@@ -32,7 +31,7 @@ const (
 
 type Message struct {
 	db  *Database
-	log log.Logger
+	log zerolog.Logger
 
 	Chat      PortalKey
 	MsgID     string
@@ -60,7 +59,7 @@ func (m *Message) Scan(row dbutil.Scannable) *Message {
 	)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
-			m.log.Errorln("Database scan failed:", err)
+			m.log.Error().Msgf("Database scan failed: %v", err)
 		}
 
 		return nil
@@ -89,7 +88,7 @@ func (m *Message) Insert(txn dbutil.Transaction) {
 		_, err = m.db.Exec(query, args...)
 	}
 	if err != nil {
-		m.log.Warnfln("Failed to insert %s %s: %v", m.Chat, m.MsgID, err)
+		m.log.Warn().Msgf("Failed to insert %s %s: %v", m.Chat, m.MsgID, err)
 	}
 }
 
@@ -113,7 +112,7 @@ func (m *Message) UpdateMXID(txn dbutil.Transaction, mxid id.EventID, newType Me
 		_, err = m.db.Exec(query, args...)
 	}
 	if err != nil {
-		m.log.Warnfln("Failed to update %s %s: %v", m.Chat, m.MsgID, err)
+		m.log.Warn().Msgf("Failed to update %s %s: %v", m.Chat, m.MsgID, err)
 	}
 }
 
@@ -127,6 +126,6 @@ func (m *Message) Delete() {
 	}
 	_, err := m.db.Exec(query, args...)
 	if err != nil {
-		m.log.Warnfln("Failed to delete %s %s: %v", m.Chat, m.MsgID, err)
+		m.log.Warn().Msgf("Failed to delete %s %s: %v", m.Chat, m.MsgID, err)
 	}
 }

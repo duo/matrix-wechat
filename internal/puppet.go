@@ -10,11 +10,10 @@ import (
 	"github.com/duo/matrix-wechat/internal/database"
 	"github.com/duo/matrix-wechat/internal/types"
 
+	"github.com/rs/zerolog"
 	"maunium.net/go/mautrix/appservice"
 	"maunium.net/go/mautrix/bridge"
 	"maunium.net/go/mautrix/id"
-
-	log "maunium.net/go/maulogger/v2"
 )
 
 var userIDRegex *regexp.Regexp
@@ -25,7 +24,7 @@ type Puppet struct {
 	*database.Puppet
 
 	bridge *WechatBridge
-	log    log.Logger
+	log    zerolog.Logger
 
 	MXID id.UserID
 
@@ -76,7 +75,7 @@ func (p *Puppet) UpdateAvatar(source *User, forceAvatarSync bool, forcePortalSyn
 	}
 	err := p.DefaultIntent().SetAvatarURL(p.AvatarURL)
 	if err != nil {
-		p.log.Warnln("Failed to set avatar:", err)
+		p.log.Warn().Msgf("Failed to set avatar: %v", err)
 	} else {
 		p.AvatarSet = true
 	}
@@ -93,11 +92,11 @@ func (p *Puppet) UpdateName(contact types.ContactInfo, forcePortalSync bool) boo
 		p.NameSet = false
 		err := p.DefaultIntent().SetDisplayName(newName)
 		if err == nil {
-			p.log.Debugln("Updated name", p.Displayname, "->", newName)
+			p.log.Debug().Msgf("Updated name %s -> %s", p.Displayname, newName)
 			p.NameSet = true
 			go p.updatePortalName()
 		} else {
-			p.log.Warnln("Failed to set display name:", err)
+			p.log.Warn().Msgf("Failed to set display name: %v", err)
 		}
 		return true
 	} else if forcePortalSync {
@@ -108,29 +107,29 @@ func (p *Puppet) UpdateName(contact types.ContactInfo, forcePortalSync bool) boo
 }
 
 func (p *Puppet) updatePortalMeta(meta func(portal *Portal)) {
-	if p.bridge.Config.Bridge.PrivateChatPortalMeta {
-		for _, portal := range p.bridge.GetAllPortalsByUID(p.UID) {
-			// Get room create lock to prevent races between receiving contact info and room creation.
-			portal.roomCreateLock.Lock()
-			meta(portal)
-			portal.roomCreateLock.Unlock()
-		}
+	for _, portal := range p.bridge.GetAllPortalsByUID(p.UID) {
+		// Get room create lock to prevent races between receiving contact info and room creation.
+		portal.roomCreateLock.Lock()
+		meta(portal)
+		portal.roomCreateLock.Unlock()
 	}
 }
 
 func (p *Puppet) updatePortalAvatar() {
 	p.updatePortalMeta(func(portal *Portal) {
-		if portal.Avatar == p.Avatar && portal.AvatarURL == p.AvatarURL && portal.AvatarSet {
+		if portal.Avatar == p.Avatar && portal.AvatarURL == p.AvatarURL && (portal.AvatarSet || !portal.shouldSetDMRoomMetadata()) {
 			return
 		}
 		portal.AvatarURL = p.AvatarURL
 		portal.Avatar = p.Avatar
 		portal.AvatarSet = false
 		defer portal.Update(nil)
-		if len(portal.MXID) > 0 {
+		if len(portal.MXID) > 0 && !portal.shouldSetDMRoomMetadata() {
+			portal.UpdateBridgeInfo()
+		} else if len(portal.MXID) > 0 {
 			_, err := portal.MainIntent().SetRoomAvatar(portal.MXID, p.AvatarURL)
 			if err != nil {
-				portal.log.Warnln("Failed to set avatar:", err)
+				portal.log.Warn().Msgf("Failed to set avatar: %v", err)
 			} else {
 				portal.AvatarSet = true
 				portal.UpdateBridgeInfo()
@@ -150,7 +149,7 @@ func (p *Puppet) SyncContact(source *User, forceAvatarSync bool, reason string) 
 	if info != nil {
 		p.Sync(source, types.NewContact(info.ID, info.Name, info.Remark), forceAvatarSync, false)
 	} else {
-		p.log.Warnfln("No contact info found through %s in SyncContact (sync reason: %s)", source.MXID, reason)
+		p.log.Warn().Msgf("No contact info found through %s in SyncContact (sync reason: %s)", source.MXID, reason)
 	}
 }
 
@@ -160,10 +159,10 @@ func (p *Puppet) Sync(source *User, contact *types.ContactInfo, forceAvatarSync,
 
 	err := p.DefaultIntent().EnsureRegistered()
 	if err != nil {
-		p.log.Errorln("Failed to ensure registered:", err)
+		p.log.Error().Msgf("Failed to ensure registered: %v", err)
 	}
 
-	p.log.Debugfln("Syncing info through %s", source.UID)
+	p.log.Debug().Msgf("Syncing info through %s", source.UID)
 
 	update := false
 	if contact != nil {
@@ -178,19 +177,16 @@ func (p *Puppet) Sync(source *User, contact *types.ContactInfo, forceAvatarSync,
 	}
 }
 
-func (br *WechatBridge) ParsePuppetMXID(mxid id.UserID) (types.UID, bool) {
-	var uid types.UID
+func (br *WechatBridge) ParsePuppetMXID(mxid id.UserID) (uid types.UID, ok bool) {
 	if userIDRegex == nil {
-		userIDRegex = regexp.MustCompile(fmt.Sprintf("^@%s:%s$",
-			br.Config.Bridge.FormatUsername("(.+)"),
-			br.Config.Homeserver.Domain))
+		userIDRegex = br.Config.MakeUserIDRegex("(.+)")
 	}
 	match := userIDRegex.FindStringSubmatch(string(mxid))
 	if len(match) == 2 {
 		uid = types.NewUserUID(match[1])
-		return uid, true
+		ok = true
 	}
-	return uid, false
+	return
 }
 
 func (br *WechatBridge) GetPuppetByMXID(mxid id.UserID) *Puppet {
@@ -323,7 +319,7 @@ func (br *WechatBridge) NewPuppet(dbPuppet *database.Puppet) *Puppet {
 	return &Puppet{
 		Puppet: dbPuppet,
 		bridge: br,
-		log:    br.Log.Sub(fmt.Sprintf("Puppet/%s", dbPuppet.UID)),
+		log:    br.ZLog.With().Str("puppet", dbPuppet.UID.String()).Logger(),
 
 		MXID: br.FormatPuppetMXID(dbPuppet.UID),
 	}
