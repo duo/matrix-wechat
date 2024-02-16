@@ -88,8 +88,12 @@ bridge:
     listen_address: "0.0.0.0:20002"
     listen_secret: foobar
     # Should the bridge create a space for each logged-in user and add bridged rooms to it?
-    # Users who logged in before turning this on should run `!wa sync space` to create and fill the space for the first time.
-    personal_filtering_spaces: false
+    # Users who logged in before turning this on should run `sync space` to create and fill the space for the first time.
+    personal_filtering_spaces: true
+    # Should the bridge create a single separate space for all official accounts?
+    # If disabled, PMs and official accounts will be added to the same space.
+    # Only works if personal_filtering_spaces is enabled.
+    space_for_official_accounts: true
     # Whether the bridge should send the message status as a custom com.beeper.message_send_status event.
     message_status_events: false
     # Whether the bridge should send error notices via m.notice events when a message fails to bridge.

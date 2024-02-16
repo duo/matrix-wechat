@@ -25,7 +25,8 @@ type BridgeConfig struct {
 	ListenAddress       string `yaml:"listen_address"`
 	ListenSecret        string `yaml:"listen_secret"`
 
-	PersonalFilteringSpaces bool `yaml:"personal_filtering_spaces"`
+	PersonalFilteringSpaces  bool `yaml:"personal_filtering_spaces"`
+	SpaceForOfficialAccounts bool `yaml:"space_for_official_accounts"`
 
 	MessageStatusEvents bool `yaml:"message_status_events"`
 	MessageErrorNotices bool `yaml:"message_error_notices"`

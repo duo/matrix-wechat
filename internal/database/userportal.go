@@ -113,3 +113,51 @@ func (u *User) MarkInSpace(portal PortalKey) {
 		u.inSpaceCache[portal] = true
 	}
 }
+
+func (u *User) MarkNotInSpace(portal PortalKey) {
+	u.inSpaceCacheLock.Lock()
+	defer u.inSpaceCacheLock.Unlock()
+
+	query := `
+		INSERT INTO user_portal
+			(user_mxid, portal_uid, portal_receiver, in_space)
+		VALUES ($1, $2, $3, true)
+		ON CONFLICT (user_mxid, portal_uid, portal_receiver)
+		DO UPDATE SET
+			in_space=false
+	`
+	args := []interface{}{
+		u.MXID, portal.UID, portal.Receiver,
+	}
+
+	_, err := u.db.Exec(query, args...)
+	if err != nil {
+		u.log.Warnfln("Failed to update in space status: %v", err)
+	} else {
+		u.inSpaceCache[portal] = true
+	}
+}
+
+func (u *User) MarkInOfficialAccountSpace(portal PortalKey) {
+	u.inSpaceCacheLock.Lock()
+	defer u.inSpaceCacheLock.Unlock()
+
+	query := `
+		INSERT INTO user_portal
+			(user_mxid, portal_uid, portal_receiver, in_space)
+		VALUES ($1, $2, $3, true)
+		ON CONFLICT (user_mxid, portal_uid, portal_receiver)
+		DO UPDATE SET
+			in_official_account_space=true
+	`
+	args := []interface{}{
+		u.MXID, portal.UID, portal.Receiver,
+	}
+
+	_, err := u.db.Exec(query, args...)
+	if err != nil {
+		u.log.Warnfln("Failed to update in space status: %v", err)
+	} else {
+		u.inSpaceCache[portal] = true
+	}
+}
