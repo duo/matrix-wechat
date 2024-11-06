@@ -1,0 +1,83 @@
+name: binary
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  binary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Install packages
+        run: sudo apt-get install -q -y build-essential libolm-dev gcc git cmake
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "1.21.5"
+
+      - name: Build olm
+        run: |
+          echo `pwd`
+          cd /tmp
+          git clone https://gitlab.matrix.org/matrix-org/olm.git
+          cd olm
+          git checkout 3.2.14
+          cmake . -Bbuild -DBUILD_SHARED_LIBS=NO
+          cmake --build build
+          sudo cmake --install build
+
+      - name: Build amd64 binary
+        env:
+          CGO_ENABLED: 1
+        run: |
+          mkdir build
+          go build -ldflags '-linkmode external -extldflags "-static" -s -w' -o build/matrix-wechat-linux-amd64 main.go
+
+      - name: Build arm64 binary
+        uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: aarch64
+          distro: ubuntu_latest
+
+          dockerRunArgs: |
+            --volume "${PWD}:/src"
+
+          install: |
+            apt-get update -q
+            apt-get install -q -y wget build-essential libolm-dev gcc git cmake
+            rm -rf /usr/local/go
+            wget -q https://go.dev/dl/go1.21.5.linux-arm64.tar.gz
+            tar -C /usr/local -xzf go1.21.5.linux-arm64.tar.gz
+            cd /tmp
+            git clone https://gitlab.matrix.org/matrix-org/olm.git
+            cd olm
+            git checkout 3.2.14
+            cmake . -Bbuild -DBUILD_SHARED_LIBS=NO
+            cmake --build build
+            cmake --install build
+
+          env: |
+            CGO_ENABLED: 1
+
+          run: |
+            cd /src
+            /usr/local/go/bin/go build -ldflags '-linkmode external -extldflags "-static" -s -w' -o build/matrix-wechat-linux-arm64 main.go
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: arm64-artifact
+          path: build
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: "build/*"

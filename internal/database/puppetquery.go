@@ -5,9 +5,8 @@ import (
 
 	"github.com/duo/matrix-wechat/internal/types"
 
+	"github.com/rs/zerolog"
 	"maunium.net/go/mautrix/id"
-
-	log "maunium.net/go/maulogger/v2"
 )
 
 const puppetColumns = `
@@ -17,7 +16,7 @@ const puppetColumns = `
 
 type PuppetQuery struct {
 	db  *Database
-	log log.Logger
+	log zerolog.Logger
 }
 
 func (pq *PuppetQuery) New() *Puppet {

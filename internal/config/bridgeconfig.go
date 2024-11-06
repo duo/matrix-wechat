@@ -18,6 +18,8 @@ const (
 )
 
 type BridgeConfig struct {
+	HomeserverProxy string `yaml:"hs_proxy"`
+
 	UsernameTemplate    string `yaml:"username_template"`
 	DisplaynameTemplate string `yaml:"displayname_template"`
 	ListenAddress       string `yaml:"listen_address"`
@@ -33,21 +35,18 @@ type BridgeConfig struct {
 
 	UserAvatarSync bool `yaml:"user_avatar_sync"`
 
-	SyncWithCustomPuppets bool `yaml:"sync_with_custom_puppets"`
 	SyncDirectChatList    bool `yaml:"sync_direct_chat_list"`
 	DefaultBridgePresence bool `yaml:"default_bridge_presence"`
 	SendPresenceOnTyping  bool `yaml:"send_presence_on_typing"`
 
-	DoublePuppetServerMap      map[string]string `yaml:"double_puppet_server_map"`
-	DoublePuppetAllowDiscovery bool              `yaml:"double_puppet_allow_discovery"`
-	LoginSharedSecretMap       map[string]string `yaml:"login_shared_secret_map"`
+	DoublePuppetConfig bridgeconfig.DoublePuppetConfig `yaml:",inline"`
 
-	PrivateChatPortalMeta bool `yaml:"private_chat_portal_meta"`
-	ParallelMemberSync    bool `yaml:"parallel_member_sync"`
-	ResendBridgeInfo      bool `yaml:"resend_bridge_info"`
-	MuteBridging          bool `yaml:"mute_bridging"`
-	AllowUserInvite       bool `yaml:"allow_user_invite"`
-	FederateRooms         bool `yaml:"federate_rooms"`
+	PrivateChatPortalMeta string `yaml:"private_chat_portal_meta"`
+	ParallelMemberSync    bool   `yaml:"parallel_member_sync"`
+	ResendBridgeInfo      bool   `yaml:"resend_bridge_info"`
+	MuteBridging          bool   `yaml:"mute_bridging"`
+	AllowUserInvite       bool   `yaml:"allow_user_invite"`
+	FederateRooms         bool   `yaml:"federate_rooms"`
 
 	MessageHandlingTimeout struct {
 		ErrorAfterStr string `yaml:"error_after"`
@@ -72,6 +71,10 @@ type BridgeConfig struct {
 }
 
 type umBridgeConfig BridgeConfig
+
+func (bc BridgeConfig) GetDoublePuppetConfig() bridgeconfig.DoublePuppetConfig {
+	return bc.DoublePuppetConfig
+}
 
 func (bc BridgeConfig) GetEncryptionConfig() bridgeconfig.EncryptionConfig {
 	return bc.Encryption

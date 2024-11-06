@@ -3,12 +3,13 @@ package config
 import (
 	"maunium.net/go/mautrix/bridge/bridgeconfig"
 
-	up "maunium.net/go/mautrix/util/configupgrade"
+	up "go.mau.fi/util/configupgrade"
 )
 
 func DoUpgrade(helper *up.Helper) {
 	bridgeconfig.Upgrader.DoUpgrade(helper)
 
+	helper.Copy(up.Str, "bridge", "hs_proxy")
 	helper.Copy(up.Str, "bridge", "username_template")
 	helper.Copy(up.Str, "bridge", "displayname_template")
 	helper.Copy(up.Str, "bridge", "listen_address")
@@ -19,7 +20,6 @@ func DoUpgrade(helper *up.Helper) {
 	helper.Copy(up.Int, "bridge", "portal_message_buffer")
 	helper.Copy(up.Bool, "bridge", "allow_redaction")
 	helper.Copy(up.Bool, "bridge", "user_avatar_sync")
-	helper.Copy(up.Bool, "bridge", "sync_with_custom_puppets")
 	helper.Copy(up.Bool, "bridge", "sync_direct_chat_list")
 	helper.Copy(up.Bool, "bridge", "default_bridge_presence")
 	helper.Copy(up.Bool, "bridge", "send_presence_on_typing")
@@ -32,7 +32,15 @@ func DoUpgrade(helper *up.Helper) {
 	} else {
 		helper.Copy(up.Map, "bridge", "login_shared_secret_map")
 	}
-	helper.Copy(up.Bool, "bridge", "private_chat_portal_meta")
+	if legacyPrivateChatPortalMeta, ok := helper.Get(up.Bool, "bridge", "private_chat_portal_meta"); ok {
+		updatedPrivateChatPortalMeta := "default"
+		if legacyPrivateChatPortalMeta == "true" {
+			updatedPrivateChatPortalMeta = "always"
+		}
+		helper.Set(up.Str, updatedPrivateChatPortalMeta, "bridge", "private_chat_portal_meta")
+	} else {
+		helper.Copy(up.Str, "bridge", "private_chat_portal_meta")
+	}
 	helper.Copy(up.Bool, "bridge", "parallel_member_sync")
 	helper.Copy(up.Bool, "bridge", "resend_bridge_info")
 	helper.Copy(up.Bool, "bridge", "mute_bridging")
@@ -51,6 +59,15 @@ func DoUpgrade(helper *up.Helper) {
 	helper.Copy(up.Bool, "bridge", "encryption", "default")
 	helper.Copy(up.Bool, "bridge", "encryption", "require")
 	helper.Copy(up.Bool, "bridge", "encryption", "appservice")
+	helper.Copy(up.Bool, "bridge", "encryption", "plaintext_mentions")
+	helper.Copy(up.Bool, "bridge", "encryption", "delete_keys", "delete_outbound_on_ack")
+	helper.Copy(up.Bool, "bridge", "encryption", "delete_keys", "dont_store_outbound")
+	helper.Copy(up.Bool, "bridge", "encryption", "delete_keys", "ratchet_on_decrypt")
+	helper.Copy(up.Bool, "bridge", "encryption", "delete_keys", "delete_fully_used_on_decrypt")
+	helper.Copy(up.Bool, "bridge", "encryption", "delete_keys", "delete_prev_on_new_session")
+	helper.Copy(up.Bool, "bridge", "encryption", "delete_keys", "delete_on_device_delete")
+	helper.Copy(up.Bool, "bridge", "encryption", "delete_keys", "periodically_delete_expired")
+	helper.Copy(up.Bool, "bridge", "encryption", "delete_keys", "delete_outdated_inbound")
 	helper.Copy(up.Str, "bridge", "encryption", "verification_levels", "receive")
 	helper.Copy(up.Str, "bridge", "encryption", "verification_levels", "send")
 	helper.Copy(up.Str, "bridge", "encryption", "verification_levels", "share")
@@ -70,10 +87,12 @@ func DoUpgrade(helper *up.Helper) {
 	helper.Copy(up.Bool, "bridge", "encryption", "rotation", "enable_custom")
 	helper.Copy(up.Int, "bridge", "encryption", "rotation", "milliseconds")
 	helper.Copy(up.Int, "bridge", "encryption", "rotation", "messages")
+	helper.Copy(up.Bool, "bridge", "encryption", "rotation", "disable_device_change_key_rotation")
 	helper.Copy(up.Map, "bridge", "permissions")
 }
 
 var SpacedBlocks = [][]string{
+	{"homeserver", "software"},
 	{"appservice"},
 	{"appservice", "hostname"},
 	{"appservice", "database"},

@@ -13,7 +13,7 @@ type Config struct {
 
 func (c *Config) CanAutoDoublePuppet(userID id.UserID) bool {
 	_, homeserver, _ := userID.Parse()
-	_, hasSecret := c.Bridge.LoginSharedSecretMap[homeserver]
+	_, hasSecret := c.Bridge.DoublePuppetConfig.SharedSecretMap[homeserver]
 
 	return hasSecret
 }
