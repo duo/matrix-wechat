@@ -420,7 +420,7 @@ func (p *Portal) convertWechatMedia(source *User, msg *wechat.Event, intent *app
 			MimeType: mime.String(),
 			Size:     len(binary),
 		},
-		Body: data.Name,
+		Body: data.Name + mime.Extension(),
 	}
 	converted.Type = event.EventMessage
 	converted.Content = content

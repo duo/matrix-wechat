@@ -123,7 +123,7 @@ func (u *User) sendQR(ce *WrappedCommandEvent, qrCode []byte) (id.EventID, error
 	}
 	content := event.MessageEventContent{
 		MsgType: event.MsgImage,
-		Body:    "",
+		Body:    "qr.png",
 		URL:     url.CUString(),
 	}
 	resp, err := ce.Bot.SendMessageEvent(ce.RoomID, event.EventMessage, &content)
