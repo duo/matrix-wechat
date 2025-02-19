@@ -473,18 +473,62 @@ func fnSync(ce *WrappedCommandEvent) {
 			ce.Reply("Personal filtering spaces are not enabled on this instance of the bridge")
 			return
 		}
-		keys := ce.Bridge.DB.Portal.FindPrivateChatsNotInSpace(ce.User.UID)
-		count := 0
-		for _, key := range keys {
-			portal := ce.Bridge.GetPortalByUID(key)
-			portal.addToSpace(ce.User)
-			count++
+		if !ce.Bridge.Config.Bridge.SpaceForOfficialAccounts {
+			count := 0
+			chatsToAdd := ce.Bridge.DB.Portal.FindAllChatsNotInSpace(ce.User.UID)
+			for _, key := range chatsToAdd {
+				portal := ce.Bridge.GetPortalByUID(key)
+				portal.addToSpace(ce.User)
+				count++
+			}
+			plural := "s"
+			if count == 1 {
+				plural = ""
+			}
+			println("[DEBUG] Added", plural, "room"+plural+" to space")
+			ce.Reply("Added %d room%s to space", count, plural)
+		} else {
+			privateChatsToAdd := ce.Bridge.DB.Portal.FindPrivateChatsNotInSpace(ce.User.UID)
+			officialAccountsToAdd := ce.Bridge.DB.Portal.FindOfficialAccountsNotInOASpace(ce.User.UID)
+			officialAccountsToRemove := ce.Bridge.DB.Portal.FindOfficialAccountsInDefaultSpace(ce.User.UID)
+			privateAdded := 0
+			officialAdded := 0
+			officialRemoved := 0
+			for _, key := range privateChatsToAdd {
+				portal := ce.Bridge.GetPortalByUID(key)
+				portal.addToSpace(ce.User)
+				privateAdded++
+			}
+			for _, key := range officialAccountsToAdd {
+				portal := ce.Bridge.GetPortalByUID(key)
+				portal.addToOfficialAccountSpace(ce.User)
+				officialAdded++
+			}
+			for _, key := range officialAccountsToRemove {
+				portal := ce.Bridge.GetPortalByUID(key)
+				portal.removeFromSpace(ce.User)
+				officialRemoved++
+			}
+			privateAddedPlural := "s"
+			officialAddedPlural := "s"
+			if privateAdded == 1 {
+				privateAddedPlural = ""
+			}
+			if officialAdded == 1 {
+				officialAddedPlural = ""
+			}
+			officialRemovedMessage := ""
+			if officialRemoved > 0 {
+				plural := "s"
+				if officialRemoved == 1 {
+					plural = ""
+				}
+				officialRemovedMessage = ", and removed " + strconv.Itoa(officialRemoved) + " official account" + plural + " from space"
+			}
+			println("[DEBUG] Added", privateAdded, "DM room"+privateAddedPlural+" to space"+officialRemovedMessage)
+			ce.Reply("Added %d DM room%s and %d official account%s to space"+officialRemovedMessage,
+				privateAdded, privateAddedPlural, officialAdded, officialAddedPlural)
 		}
-		plural := "s"
-		if count == 1 {
-			plural = ""
-		}
-		ce.Reply("Added %d DM room%s to space", count, plural)
 	}
 	if groups {
 		err := ce.User.ResyncGroups(createPortals)

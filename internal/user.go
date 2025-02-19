@@ -55,7 +55,8 @@ type User struct {
 	spaceCreateLock sync.Mutex
 	connLock        sync.Mutex
 
-	spaceMembershipChecked bool
+	spaceMembershipChecked                bool
+	officialAccountSpaceMembershipChecked bool
 
 	BridgeState *bridge.BridgeStateQueue
 
@@ -266,6 +267,59 @@ func (u *User) GetSpaceRoom() id.RoomID {
 	u.spaceMembershipChecked = true
 
 	return u.SpaceRoom
+}
+
+func (u *User) GetOfficialAccountSpaceRoom() id.RoomID {
+	if !u.bridge.Config.Bridge.PersonalFilteringSpaces {
+		return ""
+	}
+	if !u.bridge.Config.Bridge.SpaceForOfficialAccounts {
+		return ""
+	}
+
+	if len(u.OfficialAccountSpaceRoom) == 0 {
+		u.spaceCreateLock.Lock()
+		defer u.spaceCreateLock.Unlock()
+		if len(u.OfficialAccountSpaceRoom) > 0 {
+			return u.OfficialAccountSpaceRoom
+		}
+
+		resp, err := u.bridge.Bot.CreateRoom(&mautrix.ReqCreateRoom{
+			Visibility: "private",
+			Name:       "WeChat Official Accounts",
+			Topic:      "Your WeChat bridged official accounts",
+			InitialState: []*event.Event{{
+				Type: event.StateRoomAvatar,
+				Content: event.Content{
+					Parsed: &event.RoomAvatarEventContent{
+						URL: u.bridge.Config.AppService.Bot.ParsedAvatar,
+					},
+				},
+			}},
+			CreationContent: map[string]interface{}{
+				"type": event.RoomTypeSpace,
+			},
+			PowerLevelOverride: &event.PowerLevelsEventContent{
+				Users: map[id.UserID]int{
+					u.bridge.Bot.UserID: 9001,
+					u.MXID:              50,
+				},
+			},
+		})
+
+		if err != nil {
+			u.log.Errorln("Failed to auto-create space room for official accounts:", err)
+		} else {
+			u.OfficialAccountSpaceRoom = resp.RoomID
+			u.Update()
+			u.ensureInvited(u.bridge.Bot, u.OfficialAccountSpaceRoom, false)
+		}
+	} else if !u.officialAccountSpaceMembershipChecked && !u.bridge.StateStore.IsInRoom(u.OfficialAccountSpaceRoom, u.MXID) {
+		u.ensureInvited(u.bridge.Bot, u.OfficialAccountSpaceRoom, false)
+	}
+	u.officialAccountSpaceMembershipChecked = true
+
+	return u.OfficialAccountSpaceRoom
 }
 
 func (u *User) GetManagementRoom() id.RoomID {

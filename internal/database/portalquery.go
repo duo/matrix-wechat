@@ -65,13 +65,117 @@ func (pq *PortalQuery) FindPrivateChats(receiver types.UID) []*Portal {
 	return pq.getAll(query, args...)
 }
 
+func (pq *PortalQuery) FindAllChatsNotInSpace(receiver types.UID) []PortalKey {
+	keys := []PortalKey{}
+
+	query := `
+		SELECT portal.uid FROM portal
+			LEFT JOIN user_portal
+			ON portal.uid = user_portal.portal_uid
+			AND portal.receiver = user_portal.portal_receiver
+		WHERE portal.mxid != ''
+			AND portal.receiver = $1
+			AND (user_portal.in_space = false OR user_portal.in_space IS NULL)
+	`
+	args := []interface{}{receiver}
+
+	rows, err := pq.db.Query(query, args...)
+	if err != nil || rows == nil {
+		return keys
+	}
+
+	defer rows.Close()
+	for rows.Next() {
+		var key PortalKey
+		key.Receiver = receiver
+		err = rows.Scan(&key.UID)
+		if err == nil {
+			keys = append(keys, key)
+		}
+	}
+
+	return keys
+}
+
 func (pq *PortalQuery) FindPrivateChatsNotInSpace(receiver types.UID) []PortalKey {
 	keys := []PortalKey{}
 
 	query := `
-		SELECT uid FROM portal
-		    LEFT JOIN user_portal ON portal.uid=user_portal.portal_uid AND portal.receiver=user_portal.portal_receiver
-		WHERE mxid<>'' AND receiver=$1 AND (in_space=false OR in_space IS NULL)
+		SELECT portal.uid FROM portal
+			LEFT JOIN user_portal
+			ON portal.uid = user_portal.portal_uid
+			AND portal.receiver = user_portal.portal_receiver
+		WHERE portal.mxid != ''
+			AND portal.uid NOT LIKE 'gh_%'
+			AND portal.receiver = $1
+			AND (user_portal.in_space = false OR user_portal.in_space IS NULL)
+	`
+	args := []interface{}{receiver}
+
+	rows, err := pq.db.Query(query, args...)
+	if err != nil || rows == nil {
+		return keys
+	}
+
+	defer rows.Close()
+	for rows.Next() {
+		var key PortalKey
+		key.Receiver = receiver
+		err = rows.Scan(&key.UID)
+		if err == nil {
+			keys = append(keys, key)
+		}
+	}
+
+	return keys
+}
+
+func (pq *PortalQuery) FindOfficialAccountsInDefaultSpace(receiver types.UID) []PortalKey {
+	keys := []PortalKey{}
+
+	query := `
+		SELECT portal.uid FROM portal
+			LEFT JOIN user_portal
+			ON portal.uid = user_portal.portal_uid
+			AND portal.receiver = user_portal.portal_receiver
+		WHERE portal.mxid != ''
+			AND portal.uid LIKE 'gh_%'
+			AND portal.receiver = $1
+			AND user_portal.in_space = true
+	`
+	args := []interface{}{receiver}
+
+	rows, err := pq.db.Query(query, args...)
+	if err != nil || rows == nil {
+		return keys
+	}
+
+	defer rows.Close()
+	for rows.Next() {
+		var key PortalKey
+		key.Receiver = receiver
+		err = rows.Scan(&key.UID)
+		if err == nil {
+			keys = append(keys, key)
+		}
+	}
+
+	return keys
+}
+
+func (pq *PortalQuery) FindOfficialAccountsNotInOASpace(receiver types.UID) []PortalKey {
+	keys := []PortalKey{}
+
+	query := `
+		SELECT portal.uid FROM portal
+			LEFT JOIN user_portal
+			ON portal.uid = user_portal.portal_uid
+			AND portal.receiver = user_portal.portal_receiver
+		WHERE portal.mxid != ''
+			AND portal.uid LIKE 'gh_%'
+			AND portal.receiver = $1
+			AND (user_portal.in_official_account_space = false
+				OR user_portal.in_official_account_space IS NULL)
 	`
 	args := []interface{}{receiver}
 
